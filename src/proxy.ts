@@ -376,10 +376,8 @@ function buildUpstreamUrl(
 
   const { apiKey, baseUrl, provider } = access;
 
-  // All models go through the Copilot API — use model ID as-is
-  const normalizedPath = baseUrl.endsWith("/v1") && path.startsWith("/v1")
-    ? path.slice(3)
-    : path;
+  // Copilot API uses /chat/completions, not /v1/chat/completions
+  const normalizedPath = path.startsWith("/v1/") ? path.slice(3) : path;
 
   return {
     url: `${baseUrl}${normalizedPath}`,
@@ -398,6 +396,9 @@ function buildProviderHeaders(provider: string, apiKey: string, _viaOpenRouter =
     "content-type": "application/json",
     "user-agent": USER_AGENT,
     "authorization": `Bearer ${apiKey}`,
+    "editor-version": "vscode/1.100.0",
+    "editor-plugin-version": "copilot-chat/0.26.0",
+    "copilot-integration-id": "vscode-chat",
   };
 }
 
