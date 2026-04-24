@@ -820,9 +820,26 @@ async function proxyRequest(
 
       lastError = { body: result.errorBody || "Unknown error", status: result.errorStatus || 500 };
       if (result.isProviderError && !isLastAttempt) {
-        if (result.errorStatus === 429) markRateLimited(tryModel);
+        if (result.errorStatus === 429) {
+          markRateLimited(tryModel);
+          console.log(`[ClawRouter] Quota exceeded for ${tryModel}`);
+        }
         console.log(`[ClawRouter] Provider error from ${tryModel}, trying fallback: ${result.errorBody?.slice(0, 100)}`);
         continue;
+      }
+
+      // If last attempt failed with 429 (quota), try free model as last resort
+      if (result.errorStatus === 429 && isLastAttempt) {
+        const FREE_MODEL = "gpt-4.1";
+        console.log(`[ClawRouter] Premium quota exceeded — falling back to free model: ${FREE_MODEL}`);
+        const freeResult = await tryModelRequest(FREE_MODEL, requestPath, req.method ?? "POST", body, maxTokens, options.apiKeys, controller.signal);
+        if (freeResult.success && freeResult.response) {
+          upstream = freeResult.response;
+          actualModelUsed = FREE_MODEL;
+          console.log(`[ClawRouter] Success with free model: ${FREE_MODEL}`);
+          break;
+        }
+        lastError = { body: freeResult.errorBody || "Free model also failed", status: freeResult.errorStatus || 500 };
       }
       break;
     }

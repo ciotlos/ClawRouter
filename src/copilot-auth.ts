@@ -1,18 +1,16 @@
 /**
  * Copilot Authentication
  *
- * Handles the GitHub OAuth device flow to get a token that can be
- * exchanged for a Copilot API token. The Copilot token is short-lived
- * (~30 min) and auto-refreshed in the background.
+ * Handles the GitHub OAuth device flow to get a token for the Copilot API.
+ * The token from the Copilot OAuth app (Iv1.b507a08c87ecfe98) works
+ * directly as a Bearer token — no separate exchange step needed.
  *
  * Flow:
- *   1. Check for saved GitHub token in ~/.clawrouter/github_token
- *   2. If missing, run OAuth device flow (user visits github.com/login/device)
- *   3. Exchange GitHub token for Copilot token via internal API
- *   4. Refresh Copilot token every 25 minutes
- *
- * The Copilot client ID (Iv1.b507a08c87ecfe98) is the same one used by
- * the official Copilot Neovim/Vim plugins.
+ *   1. Check for cached Copilot token (not expired)
+ *   2. Check for saved GitHub token from device flow
+ *   3. Try to use it directly (the device flow token IS the API token)
+ *   4. If no token, run OAuth device flow
+ *   5. Save token for reuse across restarts
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
@@ -22,6 +20,7 @@ import { execSync } from "node:child_process";
 
 const CONFIG_DIR = join(homedir(), ".clawrouter");
 const TOKEN_FILE = join(CONFIG_DIR, "github_token");
+const COPILOT_TOKEN_FILE = join(CONFIG_DIR, "copilot_token");
 
 const COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
 const COPILOT_SCOPE = "read:user";
@@ -34,7 +33,6 @@ const EDITOR_VERSION = "vscode/1.100.0";
 const PLUGIN_VERSION = "copilot.vim/1.16.0";
 const USER_AGENT = "GithubCopilot/1.155.0";
 
-/** Refresh Copilot token every 25 minutes (they expire at ~30 min) */
 const REFRESH_INTERVAL_MS = 25 * 60 * 1000;
 
 let currentCopilotToken: string | null = null;
@@ -46,31 +44,21 @@ function ensureConfigDir(): void {
   }
 }
 
-/**
- * Load saved GitHub token from disk or environment.
- * Priority: COPILOT_GITHUB_TOKEN env > GH_TOKEN env > gh auth token > saved file
- */
+/** Load saved GitHub token from env, gh CLI, or disk. */
 function loadGitHubToken(): string | null {
-  // 1. Explicit env var
   const envToken = process.env["COPILOT_GITHUB_TOKEN"] || process.env["GH_TOKEN"] || process.env["GITHUB_TOKEN"];
   if (envToken) return envToken;
 
-  // 2. Try gh CLI
   try {
     const ghToken = execSync("gh auth token 2>/dev/null", { encoding: "utf-8" }).trim();
     if (ghToken && ghToken.length > 10) return ghToken;
-  } catch {
-    // gh not installed or not authenticated
-  }
+  } catch { /* gh not installed */ }
 
-  // 3. Saved file
   if (existsSync(TOKEN_FILE)) {
     try {
       const saved = readFileSync(TOKEN_FILE, "utf-8").trim();
       if (saved) return saved;
-    } catch {
-      // Corrupt file
-    }
+    } catch { /* corrupt */ }
   }
 
   return null;
@@ -81,10 +69,28 @@ function saveGitHubToken(token: string): void {
   writeFileSync(TOKEN_FILE, token, { mode: 0o600 });
 }
 
-/**
- * Run the GitHub OAuth device flow to get a new token.
- * Prints a URL and code for the user to visit.
- */
+/** Save Copilot token with timestamp for reuse across restarts. */
+function saveCopilotToken(token: string): void {
+  ensureConfigDir();
+  const data = JSON.stringify({ token, savedAt: Date.now() });
+  writeFileSync(COPILOT_TOKEN_FILE, data, { mode: 0o600 });
+}
+
+/** Load cached Copilot token if it's less than 25 minutes old. */
+function loadCachedCopilotToken(): string | null {
+  if (!existsSync(COPILOT_TOKEN_FILE)) return null;
+  try {
+    const raw = readFileSync(COPILOT_TOKEN_FILE, "utf-8").trim();
+    const { token, savedAt } = JSON.parse(raw) as { token: string; savedAt: number };
+    const ageMs = Date.now() - savedAt;
+    if (ageMs < REFRESH_INTERVAL_MS && token) {
+      return token;
+    }
+  } catch { /* corrupt */ }
+  return null;
+}
+
+/** Run the GitHub OAuth device flow. */
 async function deviceFlow(): Promise<string> {
   console.log("[ClawRouter] Starting GitHub authentication...");
 
@@ -95,21 +101,14 @@ async function deviceFlow(): Promise<string> {
       "content-type": "application/json",
       "user-agent": USER_AGENT,
     },
-    body: JSON.stringify({
-      client_id: COPILOT_CLIENT_ID,
-      scope: COPILOT_SCOPE,
-    }),
+    body: JSON.stringify({ client_id: COPILOT_CLIENT_ID, scope: COPILOT_SCOPE }),
   });
 
-  if (!codeResp.ok) {
-    throw new Error(`Device code request failed: ${codeResp.status}`);
-  }
+  if (!codeResp.ok) throw new Error(`Device code request failed: ${codeResp.status}`);
 
   const codeData = await codeResp.json() as {
-    device_code: string;
-    user_code: string;
-    verification_uri: string;
-    interval: number;
+    device_code: string; user_code: string;
+    verification_uri: string; interval: number;
   };
 
   console.log("");
@@ -137,121 +136,114 @@ async function deviceFlow(): Promise<string> {
       }),
     });
 
-    const tokenData = await tokenResp.json() as {
-      access_token?: string;
-      error?: string;
-    };
+    const tokenData = await tokenResp.json() as { access_token?: string; error?: string };
 
     if (tokenData.access_token) {
       console.log("[ClawRouter] Authentication successful!");
       return tokenData.access_token;
     }
-
-    if (tokenData.error === "authorization_pending") {
-      continue;
-    }
-
-    if (tokenData.error === "slow_down") {
-      await new Promise((r) => setTimeout(r, 5000));
-      continue;
-    }
-
-    if (tokenData.error === "expired_token") {
-      throw new Error("Authentication timed out. Please try again.");
-    }
-
+    if (tokenData.error === "authorization_pending") continue;
+    if (tokenData.error === "slow_down") { await new Promise((r) => setTimeout(r, 5000)); continue; }
+    if (tokenData.error === "expired_token") throw new Error("Authentication timed out. Please try again.");
     throw new Error(`Authentication failed: ${tokenData.error}`);
   }
 }
 
-/**
- * Exchange a GitHub token for a short-lived Copilot API token.
- */
-async function exchangeForCopilotToken(githubToken: string): Promise<string> {
-  const resp = await fetch(TOKEN_EXCHANGE_URL, {
-    headers: {
-      "authorization": `token ${githubToken}`,
-      "editor-version": EDITOR_VERSION,
-      "editor-plugin-version": PLUGIN_VERSION,
-      "user-agent": USER_AGENT,
-    },
-  });
-
-  if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(`Copilot token exchange failed (${resp.status}): ${body}`);
+/** Try to exchange GitHub token for Copilot token via internal API. */
+async function tryTokenExchange(githubToken: string): Promise<string | null> {
+  try {
+    const resp = await fetch(TOKEN_EXCHANGE_URL, {
+      headers: {
+        "authorization": `token ${githubToken}`,
+        "editor-version": EDITOR_VERSION,
+        "editor-plugin-version": PLUGIN_VERSION,
+        "user-agent": USER_AGENT,
+      },
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json() as { token?: string };
+    return data.token ?? null;
+  } catch {
+    return null;
   }
-
-  const data = await resp.json() as { token?: string; expires_at?: number };
-  if (!data.token) {
-    throw new Error("Copilot token exchange returned no token");
-  }
-
-  return data.token;
 }
 
 /**
  * Get a valid Copilot API token.
- * Handles the full flow: load/create GitHub token → exchange → cache → refresh.
+ *
+ * Priority:
+ *   1. In-memory cached token
+ *   2. Disk-cached Copilot token (< 25 min old)
+ *   3. Exchange GitHub token via internal API
+ *   4. Use GitHub token directly (device flow tokens work as Bearer)
+ *   5. Run device flow if nothing else works
  */
 export async function getCopilotToken(): Promise<string> {
   if (currentCopilotToken) return currentCopilotToken;
 
-  // Get or create GitHub token
+  // Try disk-cached Copilot token
+  const cached = loadCachedCopilotToken();
+  if (cached) {
+    console.log("[ClawRouter] Using cached token");
+    currentCopilotToken = cached;
+    return cached;
+  }
+
+  // Try existing GitHub token
   let githubToken = loadGitHubToken();
-  if (!githubToken) {
-    githubToken = await deviceFlow();
-    saveGitHubToken(githubToken);
+  if (githubToken) {
+    // Try the internal exchange first
+    const exchanged = await tryTokenExchange(githubToken);
+    if (exchanged) {
+      currentCopilotToken = exchanged;
+      saveCopilotToken(exchanged);
+      return exchanged;
+    }
+
+    // Exchange failed — use the GitHub token directly as Bearer
+    // (device flow tokens from the Copilot OAuth app work directly)
+    console.log("[ClawRouter] Using saved token directly");
+    currentCopilotToken = githubToken;
+    saveCopilotToken(githubToken);
+    return githubToken;
   }
 
-  // Exchange for Copilot token
-  try {
-    currentCopilotToken = await exchangeForCopilotToken(githubToken);
-  } catch (err) {
-    // Token might be expired/revoked — try device flow
-    console.log(`[ClawRouter] Token exchange failed, re-authenticating...`);
-    githubToken = await deviceFlow();
-    saveGitHubToken(githubToken);
-    currentCopilotToken = await exchangeForCopilotToken(githubToken);
-  }
-
-  return currentCopilotToken;
+  // No token at all — run device flow
+  githubToken = await deviceFlow();
+  saveGitHubToken(githubToken);
+  currentCopilotToken = githubToken;
+  saveCopilotToken(githubToken);
+  return githubToken;
 }
 
-/**
- * Start the background token refresh loop.
- */
 export function startTokenRefresh(): void {
   if (refreshTimer) return;
 
   refreshTimer = setInterval(async () => {
     try {
       const githubToken = loadGitHubToken();
-      if (githubToken) {
-        currentCopilotToken = await exchangeForCopilotToken(githubToken);
-        console.log("[ClawRouter] Copilot token refreshed");
+      if (!githubToken) return;
+
+      const exchanged = await tryTokenExchange(githubToken);
+      if (exchanged) {
+        currentCopilotToken = exchanged;
+        saveCopilotToken(exchanged);
+        console.log("[ClawRouter] Copilot token refreshed (exchange)");
+      } else {
+        // Keep using the GitHub token directly
+        currentCopilotToken = githubToken;
+        saveCopilotToken(githubToken);
       }
     } catch (err) {
       console.error(`[ClawRouter] Token refresh failed: ${err instanceof Error ? err.message : String(err)}`);
-      currentCopilotToken = null;
     }
   }, REFRESH_INTERVAL_MS);
 }
 
-/**
- * Stop the background token refresh.
- */
 export function stopTokenRefresh(): void {
-  if (refreshTimer) {
-    clearInterval(refreshTimer);
-    refreshTimer = null;
-  }
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
 }
 
-/**
- * Get the current Copilot token without triggering auth flow.
- * Returns null if not authenticated.
- */
 export function getCurrentToken(): string | null {
   return currentCopilotToken;
 }
