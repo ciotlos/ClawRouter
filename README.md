@@ -1,162 +1,138 @@
-# ClawRouter — Smart LLM Router (Direct API Keys)
+# ClawRouter — Copilot Model Router
 
-Smart LLM router that picks the cheapest model capable of handling each request. Uses **your own API keys** — no crypto, no middleman, no markup.
-
-Forked from [BlockRun/ClawRouter](https://github.com/BlockRunAI/ClawRouter), replacing USDC/x402 micropayments with direct provider API keys.
+Routes every coding request to the best model for the task. Simple completions get a fast model, complex refactors get a strong one. Runs as a local OpenAI-compatible proxy — point your editor at it and go.
 
 ## How It Works
 
-1. You provide your own API keys for each provider
-2. ClawRouter classifies each request across **15 weighted dimensions** in <1ms
-3. Routes to the cheapest model that can handle it (4 tiers: SIMPLE → MEDIUM → COMPLEX → REASONING)
-4. Falls back through a chain of alternatives if a provider errors
+1. You start ClawRouter (one command)
+2. Point your copilot/editor at `http://127.0.0.1:8402/v1` with model `auto`
+3. ClawRouter classifies each request across **14 weighted dimensions** in <1ms
+4. Routes to the best copilot model for the task (4 tiers)
+5. Falls back through alternatives if a provider errors
 
-**Result:** Same smart routing intelligence, but you pay providers directly at their listed prices.
+| Tier | What it handles | Default Model | Why |
+|---|---|---|---|
+| **SIMPLE** | Inline completions, lookups, short answers | Grok Code Fast | Fast, cheap, good at code |
+| **MEDIUM** | Code generation, refactoring, explanations | Claude Sonnet 4.6 | Strong coding, good tool use |
+| **COMPLEX** | Multi-file edits, architecture, debugging | Claude Opus 4.6 | Best quality for hard tasks |
+| **REASONING** | Algorithm design, proofs, complex debugging | Gemini 3.1 Pro | 1M context, strong reasoning |
 
 ## Quick Start
 
-### Fastest Setup (one key → all models)
+```bash
+npm install -g clawrouter
+
+# Start the router — authenticates via GitHub on first run
+clawrouter
+```
+
+On first run, you'll see:
+
+```
+Visit: https://github.com/login/device
+Enter code: XXXX-XXXX
+```
+
+Open the link, enter the code, and you're done. The token is saved to `~/.clawrouter/github_token` and refreshed automatically. No API keys to manage.
+
+Then configure your editor to use `http://127.0.0.1:8402/v1` as the API endpoint with model `auto`.
+
+That's it. The router uses Claude Sonnet 4 for standard coding tasks and Claude Opus 4 for complex ones. Simple completions go to fast, cheap models. Reasoning tasks go to models with large context windows.
+
+## Usage Stats
+
+ClawRouter logs every routed request locally. Check your stats via the `/stats` endpoint:
 
 ```bash
-# Install
-openclaw plugins install ./ClawRouter
-
-# One OpenRouter key covers all 30+ models
-export OPENROUTER_API_KEY=sk-or-...
-
-# Use smart routing
-openclaw models set clawrouter/auto
+curl http://127.0.0.1:8402/stats | python3 -m json.tool
 ```
 
-### Optimal Setup (direct keys + OpenRouter fallback)
+Example output from the CLI:
 
-```bash
-# Direct keys are cheaper (no middleman markup)
-export OPENAI_API_KEY=sk-...
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# OpenRouter covers everything else
-export OPENROUTER_API_KEY=sk-or-...
-
-openclaw models set clawrouter/auto
+```
+╔════════════════════════════════════════════════════════════╗
+║              ClawRouter — Copilot Stats                    ║
+╠════════════════════════════════════════════════════════════╣
+║  Period: last 7 days                                       ║
+║  Requests routed: 312                                      ║
+║  Actual cost: $4.18                                        ║
+║  If all Opus: $47.62                                       ║
+║  You saved:   $43.44 (91%)                                 ║
+║  Avg cost:    $0.0134/req                                  ║
+╠════════════════════════════════════════════════════════════╣
+║  Task distribution:                                        ║
+║    Quick      ████████████         52% (162 reqs)          ║
+║    Standard   ██████               28% (87 reqs)           ║
+║    Complex    ███                  13% (41 reqs)            ║
+║    Reasoning  █                     7% (22 reqs)            ║
+╠════════════════════════════════════════════════════════════╣
+║  Models used:                                              ║
+║    grok-code-fast-1                 148 reqs  $0.31         ║
+║    claude-sonnet-4.6                 92 reqs  $1.84         ║
+║    claude-opus-4.6                   41 reqs  $1.62         ║
+║    gemini-3.1-pro                    22 reqs  $0.38         ║
+║    gpt-4.1                            9 reqs  $0.12         ║
+╚════════════════════════════════════════════════════════════╝
 ```
 
-Direct provider keys take priority. OpenRouter is used as fallback for providers without a direct key.
+The "If all Opus" line shows what it would cost to send every request to Claude Opus 4 — the premium baseline. The difference is what smart routing saves you.
 
-### Standalone
+## Agentic Auto-Detection
 
-```bash
-npm install
-npm run build
+ClawRouter detects multi-step coding tasks and routes to models optimized for autonomous execution:
 
-export OPENROUTER_API_KEY=sk-or-...
-npx clawrouter
+```
+"what does this function do"           → grok-code-fast (SIMPLE)
+"refactor this module to use async"    → claude-sonnet-4.6 (MEDIUM)
+"fix the bug and run the tests"        → claude-opus-4.6 (COMPLEX, agentic)
 ```
 
-## Configuration
+No config needed — agentic detection works automatically based on keyword signals like file operations, execution commands, and iterative patterns.
 
-### Environment Variables (recommended)
+## Session Pinning
 
-| Variable | Provider | Notes |
-|---|---|---|
-| `OPENROUTER_API_KEY` | **OpenRouter** | **One key → all models!** |
-| `OPENAI_API_KEY` | OpenAI (GPT-4o, GPT-5, o3) | Direct = cheaper |
-| `ANTHROPIC_API_KEY` | Anthropic (Claude) | Direct = cheaper |
-| `GOOGLE_API_KEY` | Google (Gemini) | Direct = cheaper |
-| `XAI_API_KEY` | xAI (Grok) | Direct = cheaper |
-| `DEEPSEEK_API_KEY` | DeepSeek | Direct = cheaper |
-| `MOONSHOT_API_KEY` | Moonshot (Kimi) | Direct = cheaper |
-| `NVIDIA_API_KEY` | NVIDIA | Direct = cheaper |
+Multi-turn conversations stay on the same model to prevent mid-task switching:
 
-**Priority:** Direct provider key > OpenRouter fallback. If you have both `OPENAI_API_KEY` and `OPENROUTER_API_KEY`, OpenAI models use the direct key while other providers fall back to OpenRouter.
-
-### Config File
-
-`~/.openclaw/clawrouter/config.json`:
-
-```json
-{
-  "providers": {
-    "openrouter": { "apiKey": "sk-or-..." },
-    "openai": { "apiKey": "sk-..." },
-    "anthropic": { "apiKey": "sk-ant-..." }
-  }
-}
+```
+Turn 1: "Build a React component"  → claude-opus-4.6
+Turn 2: "Add dark mode support"    → claude-opus-4.6 (pinned)
+Turn 3: "Now add tests"            → claude-opus-4.6 (pinned)
 ```
 
-### Plugin Config (openclaw.json)
-
-```json
-{
-  "plugins": {
-    "clawrouter": {
-      "providers": {
-        "openai": { "apiKey": "sk-..." }
-      },
-      "routing": {
-        "overrides": {
-          "ambiguousDefaultTier": "COMPLEX"
-        }
-      }
-    }
-  }
-}
-```
-
-## Routing Tiers
-
-| Tier | Use Case | Default Model |
-|---|---|---|
-| **SIMPLE** | Facts, translations, short answers | Gemini 2.5 Flash |
-| **MEDIUM** | Code generation, summaries | Grok Code Fast |
-| **COMPLEX** | System design, analysis | Gemini 2.5 Pro |
-| **REASONING** | Proofs, formal logic | Grok 4 Fast Reasoning |
-
-Models without a configured API key are automatically skipped. The router falls back through alternatives until it finds one with a valid key.
+Sessions persist for 1 hour of inactivity.
 
 ## Model Aliases
 
-Use short names: `/model sonnet`, `/model gpt`, `/model flash`, etc.
+Pin a specific model instead of using `auto`:
 
 | Alias | Model |
 |---|---|
-| `auto` | Smart router (picks best) |
-| `sonnet` | Claude Sonnet 4 |
-| `opus` | Claude Opus 4 |
+| `sonnet` | Claude Sonnet 4.6 |
+| `opus` | Claude Opus 4.6 |
 | `haiku` | Claude Haiku 4.5 |
-| `gpt` | GPT-4o |
-| `flash` | Gemini 2.5 Flash |
-| `deepseek` | DeepSeek V3.2 Chat |
-| `grok` | Grok 3 |
-| `kimi` | Kimi K2.5 |
+| `gpt` | GPT-4.1 |
+| `gpt5` | GPT-5.4 |
+| `codex` | GPT-5.3 Codex |
+| `flash` | Gemini 3 Flash |
+| `gemini` | Gemini 3.1 Pro |
+| `grok-code` | Grok Code Fast |
 
-## Commands
+## CLI Options
 
-- `/stats [days]` — Usage statistics and cost savings
-- `/keys` — Show configured API key status
+```bash
+clawrouter                  # Start (authenticates on first run)
+clawrouter --port 9000      # Custom port
+clawrouter --version        # Show version
+clawrouter --help           # Show help
+```
 
-## Features Preserved from Original
+Port can also be set via `CLAWROUTER_PORT` environment variable.
 
-- ✅ 15-dimension weighted scoring classifier (<1ms, zero cost)
-- ✅ 4-tier routing (SIMPLE/MEDIUM/COMPLEX/REASONING)
-- ✅ Agentic task auto-detection
-- ✅ Fallback chains with rate-limit awareness
-- ✅ Session pinning (prevents mid-task model switching)
-- ✅ Request deduplication
-- ✅ SSE heartbeat (prevents timeout during slow responses)
-- ✅ Usage logging and statistics
-- ✅ Tool ID sanitization (Anthropic compatibility)
-- ✅ Thinking token stripping (Kimi, DeepSeek)
-- ✅ Message normalization (roles, Google format, etc.)
+## Authentication
 
-## What Was Removed
+On first run, ClawRouter authenticates via GitHub OAuth device flow — you visit a URL and enter a code. The token is saved to `~/.clawrouter/github_token` and refreshed automatically.
 
-- ❌ USDC/x402 cryptocurrency payments
-- ❌ Wallet generation and management
-- ❌ Balance monitoring (Base L2 RPC calls)
-- ❌ Payment caching and pre-authorization
-- ❌ `viem` dependency (saves ~2MB)
-- ❌ BlockRun API gateway dependency
+For non-interactive environments, set `GH_TOKEN` or `COPILOT_GITHUB_TOKEN` as an environment variable.
 
 ## License
 

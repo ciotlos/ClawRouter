@@ -1,8 +1,9 @@
 /**
  * Request Deduplication
  *
- * Prevents double-charging when OpenClaw retries a request after timeout.
+ * Prevents duplicate requests when your editor retries after timeout.
  * Tracks in-flight requests and caches completed responses for a short TTL.
+ * Uses SHA-256 to hash request bodies for fast comparison.
  */
 
 import { createHash } from "node:crypto";
@@ -41,9 +42,8 @@ function canonicalize(obj: unknown): unknown {
 }
 
 /**
- * Strip OpenClaw-injected timestamps from message content.
+ * Strip injected timestamps from message content.
  * Format: [DAY YYYY-MM-DD HH:MM TZ] at the start of messages.
- * Example: [SUN 2026-02-07 13:30 PST] Hello world
  *
  * This ensures requests with different timestamps but same content hash identically.
  */

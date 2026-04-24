@@ -1,48 +1,62 @@
 ---
 name: clawrouter
-description: Smart LLM router — save 78% on inference costs. Routes every request to the cheapest capable model across 30+ models from OpenAI, Anthropic, Google, DeepSeek, and xAI.
+description: Standalone copilot model router — routes every coding request to the best model for the task. Picks the right model across Claude, Gemini, GPT, DeepSeek, and Grok based on task complexity.
 homepage: https://github.com/BlockRunAI/ClawRouter
-metadata: { "openclaw": { "emoji": "🦀", "requires": { "config": ["models.providers.blockrun"] } } }
+metadata: { "emoji": "🦀" }
 ---
 
-# ClawRouter
+# ClawRouter — Copilot Model Router
 
-Smart LLM router that saves 78% on inference costs by routing each request to the cheapest model that can handle it. 30+ models across 5 providers, all through one wallet.
+Standalone proxy that picks the right copilot model for each coding task. Runs as an OpenAI-compatible endpoint — point any editor or tool at it.
 
-## Install
-
-```bash
-openclaw plugins install @blockrun/clawrouter
-```
-
-## Setup
+## Install & Run
 
 ```bash
-# Enable smart routing (auto-picks cheapest model per request)
-openclaw models set blockrun/auto
-
-# Or pin a specific model
-openclaw models set openai/gpt-4o
+npm install -g clawrouter
+clawrouter
 ```
+
+On first run, you'll authenticate via GitHub (visit a URL, enter a code). After that, the token is saved and refreshed automatically.
+
+Then point your editor/copilot at `http://127.0.0.1:8402/v1` with model `auto`.
 
 ## How Routing Works
 
-ClawRouter classifies each request into one of four tiers:
+ClawRouter classifies each coding request into one of four tiers and routes to the best model:
 
-- **SIMPLE** (40% of traffic) — factual lookups, greetings, translations → Gemini Flash ($0.60/M, 99% savings)
-- **MEDIUM** (30%) — summaries, explanations, data extraction → DeepSeek Chat ($0.42/M, 99% savings)
-- **COMPLEX** (20%) — code generation, multi-step analysis → Claude Opus ($75/M, best quality)
-- **REASONING** (10%) — proofs, formal logic, multi-step math → o3 ($8/M, 89% savings)
+- **SIMPLE** — inline completions, quick lookups → Grok Code Fast ($0.20/M, fast)
+- **MEDIUM** — code generation, refactoring, explanations → Claude Sonnet 4.6 ($3/M, strong coding)
+- **COMPLEX** — multi-file edits, architecture, debugging → Claude Opus 4.6 ($15/M, best quality)
+- **REASONING** — algorithm design, complex debugging, proofs → Gemini 3.1 Pro ($2/M, 1M context)
 
-Rules handle ~80% of requests in <1ms. Only ambiguous queries hit the LLM classifier (~$0.00003 per classification).
+Agentic tasks (multi-step autonomous coding) are auto-detected and routed to models optimized for tool use and long-running workflows.
 
-## Available Models
-
-30+ models including: gpt-5.2, gpt-4o, gpt-4o-mini, o3, o4-mini, claude-opus-4.5, claude-sonnet-4, claude-haiku-4.5, gemini-2.5-pro, gemini-2.5-flash, deepseek-chat, deepseek-reasoner, grok-3, grok-3-mini.
+Rules handle ~80% of requests in <1ms. Only ambiguous queries use the LLM classifier.
 
 ## Example Output
 
 ```
-[ClawRouter] google/gemini-2.5-flash (SIMPLE, rules, confidence=0.92)
-             Cost: $0.0025 | Baseline: $0.308 | Saved: 99.2%
+[ClawRouter] SIMPLE    → grok-code-fast-1 (confidence=0.92)
+[ClawRouter] COMPLEX   → claude-opus-4.6 (confidence=0.88)
+[ClawRouter] REASONING → gemini-3.1-pro (confidence=0.91)
+```
+
+## Stats
+
+```bash
+curl http://127.0.0.1:8402/stats
+```
+
+Shows task distribution, models used, and cost vs sending everything to Opus:
+
+```
+  Requests routed: 312
+  Actual cost: $4.18       If all Opus: $47.62
+  You saved:   $43.44 (91%)
+
+  Task distribution:
+    Quick      ████████████         52% (162 reqs)
+    Standard   ██████               28% (87 reqs)
+    Complex    ███                  13% (41 reqs)
+    Reasoning  █                     7% (22 reqs)
 ```

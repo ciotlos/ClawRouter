@@ -1,17 +1,12 @@
 {
   "name": "clawrouter",
   "version": "1.0.0",
-  "description": "Smart LLM router — your API keys, intelligent routing, maximum savings. No crypto required.",
+  "description": "Smart copilot model router — routes coding requests to the best model for the task.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "clawrouter": "./dist/cli.js"
-  },
-  "openclaw": {
-    "extensions": [
-      "./dist/index.js"
-    ]
   },
   "exports": {
     ".": {
@@ -20,37 +15,29 @@
     }
   },
   "files": [
-    "dist",
-    "openclaw.plugin.json"
+    "dist"
   ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "start": "node dist/cli.js",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "llm",
     "router",
+    "copilot",
     "smart-routing",
     "ai",
-    "openclaw",
-    "cost-optimization",
+    "coding-assistant",
     "openai",
     "anthropic",
     "gemini",
     "deepseek"
   ],
   "license": "MIT",
-  "peerDependencies": {
-    "openclaw": ">=2025.1.0"
-  },
-  "peerDependenciesMeta": {
-    "openclaw": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "openclaw": "latest",
+    "@types/node": "^25.6.0",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0"
   },

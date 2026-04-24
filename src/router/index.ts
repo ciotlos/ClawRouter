@@ -1,7 +1,7 @@
 /**
  * Smart Router Entry Point
  *
- * Classifies requests and routes to the cheapest capable model.
+ * Classifies coding requests and routes to the best copilot model.
  * 100% local — rules-based scoring handles all requests in <1ms.
  * Ambiguous cases default to configurable tier (MEDIUM by default).
  */
@@ -16,7 +16,7 @@ export type RouterOptions = {
 };
 
 /**
- * Route a request to the cheapest capable model.
+ * Route a request to the best copilot model for the task.
  *
  * 1. Check overrides (large context, structured output)
  * 2. Run rule-based classifier (14 weighted dimensions, <1ms)

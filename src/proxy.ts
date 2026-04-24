@@ -1,14 +1,14 @@
 /**
- * Local Proxy Server — Direct Provider Access
+ * Local Proxy Server — Copilot Model Router
  *
- * Routes requests to provider APIs using the user's own API keys.
- * Keeps all the smart routing logic (tier classification, fallback chains).
+ * Routes requests through the GitHub Copilot API, picking the best
+ * model for each coding task via smart routing.
  *
  * Flow:
- *   OpenClaw → http://localhost:{port}/v1/chat/completions
- *           → proxy classifies request, picks cheapest model
- *           → forwards to provider API (OpenAI, Anthropic, Google, etc.)
- *           → streams response back
+ *   Editor → http://localhost:{port}/v1/chat/completions
+ *         → proxy classifies request, picks best copilot model
+ *         → forwards to Copilot API (api.githubcopilot.com)
+ *         → streams response back
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -18,12 +18,10 @@ import {
   loadApiKeys,
   getConfiguredProviders,
   getApiKey,
-  getProviderBaseUrl,
   getProviderFromModel,
   resolveProviderAccess,
   isModelAccessible,
   getAccessibleProviders,
-  hasOpenRouter,
   type ApiKeysConfig,
 } from "./api-keys.js";
 import {
@@ -42,7 +40,6 @@ import { getStats } from "./stats.js";
 import { RequestDeduplicator } from "./dedup.js";
 import { USER_AGENT } from "./version.js";
 import { SessionStore, getSessionId, type SessionConfig } from "./session.js";
-import { resolveOpenRouterModelId, ensureOpenRouterCache } from "./openrouter-models.js";
 
 const AUTO_MODEL = "clawrouter/auto";
 const AUTO_MODEL_SHORT = "auto";
@@ -367,8 +364,7 @@ function mergeRoutingConfig(overrides?: Partial<RoutingConfig>): RoutingConfig {
 }
 
 /**
- * Build the upstream URL for a provider.
- * Priority: direct provider key > OpenRouter fallback.
+ * Build the upstream URL for the Copilot API.
  */
 function buildUpstreamUrl(
   modelId: string,
@@ -378,102 +374,31 @@ function buildUpstreamUrl(
   const access = resolveProviderAccess(apiKeys, modelId);
   if (!access) return undefined;
 
-  const { apiKey, baseUrl, provider, viaOpenRouter } = access;
+  const { apiKey, baseUrl, provider } = access;
 
-  if (viaOpenRouter) {
-    // Resolve ClawRouter model ID to OpenRouter's model ID
-    // e.g., "moonshot/kimi-k2.5" → "moonshotai/kimi-k2.5"
-    const resolvedModelId = resolveOpenRouterModelId(modelId);
-    // Trigger background cache refresh if stale
-    ensureOpenRouterCache(apiKey);
-    const orPath = baseUrl.endsWith("/v1") && path.startsWith("/v1") ? path.slice(3) : path;
-    return {
-      url: `${baseUrl}${orPath}`,
-      provider,
-      apiKey,
-      actualModelId: resolvedModelId,
-      viaOpenRouter: true,
-    };
-  }
-
-  // Direct provider access — strip provider prefix
-  const actualModelId = modelId.includes("/") ? modelId.split("/").slice(1).join("/") : modelId;
-
-  // Strip /v1 prefix from path if baseUrl already ends with /v1
+  // All models go through the Copilot API — use model ID as-is
   const normalizedPath = baseUrl.endsWith("/v1") && path.startsWith("/v1")
-    ? path.slice(3) // remove leading /v1
+    ? path.slice(3)
     : path;
-
-  // Google uses a different URL structure
-  if (provider === "google") {
-    return {
-      url: `${baseUrl}/models/${actualModelId}:streamGenerateContent?alt=sse`,
-      provider,
-      apiKey,
-      actualModelId,
-      viaOpenRouter: false,
-    };
-  }
-
-  // Anthropic uses /v1/messages, not /v1/chat/completions
-  // Also needs full model IDs (e.g., claude-sonnet-4-20250514)
-  if (provider === "anthropic") {
-    const ANTHROPIC_MODEL_MAP: Record<string, string> = {
-      "claude-sonnet-4": "claude-sonnet-4-20250514",
-      "claude-opus-4": "claude-opus-4-20250514",
-      "claude-opus-4.5": "claude-opus-4-20250514", // fallback
-      "claude-haiku-4.5": "claude-haiku-4-20250414",
-    };
-    const mappedModel = ANTHROPIC_MODEL_MAP[actualModelId] || actualModelId;
-    return {
-      url: `${baseUrl}/messages`,
-      provider,
-      apiKey,
-      actualModelId: mappedModel,
-      viaOpenRouter: false,
-    };
-  }
 
   return {
     url: `${baseUrl}${normalizedPath}`,
     provider,
     apiKey,
-    actualModelId,
+    actualModelId: modelId,
     viaOpenRouter: false,
   };
 }
 
 /**
- * Build headers for a provider request.
+ * Build headers for a Copilot API request.
  */
-function buildProviderHeaders(provider: string, apiKey: string, viaOpenRouter = false): Record<string, string> {
-  const headers: Record<string, string> = {
+function buildProviderHeaders(provider: string, apiKey: string, _viaOpenRouter = false): Record<string, string> {
+  return {
     "content-type": "application/json",
     "user-agent": USER_AGENT,
+    "authorization": `Bearer ${apiKey}`,
   };
-
-  // OpenRouter always uses Bearer auth (OpenAI-compatible)
-  if (viaOpenRouter) {
-    headers["authorization"] = `Bearer ${apiKey}`;
-    headers["x-title"] = "ClawRouter";
-    return headers;
-  }
-
-  switch (provider) {
-    case "anthropic":
-      headers["x-api-key"] = apiKey;
-      headers["anthropic-version"] = "2023-06-01";
-      break;
-    case "google":
-      headers["x-goog-api-key"] = apiKey;
-      break;
-    default:
-      // OpenAI-compatible providers (openai, xai, deepseek, moonshot, nvidia)
-      headers["authorization"] = `Bearer ${apiKey}`;
-      break;
-  }
-
-  return headers;
 }
 
 type ModelRequestResult = {
@@ -497,7 +422,7 @@ async function tryModelRequest(
   if (!upstream) {
     return {
       success: false,
-      errorBody: `No API key configured for provider: ${getProviderFromModel(modelId)} (and no OpenRouter fallback)`,
+      errorBody: `No API key configured — set COPILOT_API_KEY`,
       errorStatus: 401,
       isProviderError: true,
     };
@@ -514,21 +439,11 @@ async function tryModelRequest(
       parsed.messages = sanitizeToolIds(parsed.messages as ChatMessage[]);
     }
 
-    if (isGoogleModel(modelId) && Array.isArray(parsed.messages)) {
-      parsed.messages = normalizeMessagesForGoogle(parsed.messages as ChatMessage[]);
-    }
-
     if (parsed.thinking && Array.isArray(parsed.messages)) {
       parsed.messages = normalizeMessagesForThinking(parsed.messages as ExtendedChatMessage[]);
     }
 
-    // Convert OpenAI format to Anthropic Messages API format
-    if (upstream.provider === "anthropic" && !upstream.viaOpenRouter) {
-      const anthropicBody = convertToAnthropicFormat(parsed);
-      requestBody = Buffer.from(JSON.stringify(anthropicBody));
-    } else {
-      requestBody = Buffer.from(JSON.stringify(parsed));
-    }
+    requestBody = Buffer.from(JSON.stringify(parsed));
   } catch {
     // If body isn't valid JSON, use as-is
   }
@@ -536,7 +451,7 @@ async function tryModelRequest(
   const headers = buildProviderHeaders(upstream.provider, upstream.apiKey, upstream.viaOpenRouter);
 
   try {
-    console.log(`[ClawRouter] → ${upstream.provider} ${upstream.url} model=${upstream.actualModelId} viaOR=${upstream.viaOpenRouter}`);
+    console.log(`[ClawRouter] → ${upstream.url} model=${upstream.actualModelId}`);
     const response = await fetch(upstream.url, {
       method,
       headers,
@@ -601,13 +516,9 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
       res.end(JSON.stringify({
         status: "ok",
         configuredProviders,
-        openRouterFallback: hasOpenRouter(options.apiKeys),
+        openRouterFallback: false,
         accessibleProviders,
-        modelCount: BLOCKRUN_MODELS.filter((m) => {
-          if (m.id === "auto") return false;
-          const provider = getProviderFromModel(m.id);
-          return accessibleProviders.includes(provider);
-        }).length,
+        modelCount: BLOCKRUN_MODELS.filter((m) => m.id !== "auto").length,
       }));
       return;
     }
@@ -629,18 +540,12 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
 
     // Models list
     if (req.url === "/v1/models" && req.method === "GET") {
-      const accessibleProviders = getAccessibleProviders(options.apiKeys);
       const models = BLOCKRUN_MODELS
-        .filter((m) => {
-          if (m.id === "auto") return true;
-          const provider = getProviderFromModel(m.id);
-          return accessibleProviders.includes(provider);
-        })
         .map((m) => ({
           id: m.id,
           object: "model",
           created: Math.floor(Date.now() / 1000),
-          owned_by: m.id.split("/")[0] || "clawrouter",
+          owned_by: "copilot",
         }));
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ object: "list", data: models }));
@@ -816,7 +721,7 @@ async function proxyRequest(
 
           routingDecision = route(prompt, systemPrompt, maxTokens, routerOpts);
 
-          // Filter to models with configured API keys (direct or via OpenRouter)
+          // Filter to models accessible via Copilot API
           if (!isModelAccessible(options.apiKeys, routingDecision.model)) {
             // Primary model not accessible, find alternative
             const tierConfig = routerOpts.config.tiers[routingDecision.tier];
@@ -887,7 +792,7 @@ async function proxyRequest(
       const tierConfigs = useAgenticTiers ? routerOpts.config.agenticTiers! : routerOpts.config.tiers;
       const contextFiltered = getFallbackChainFiltered(routingDecision.tier, tierConfigs, estimatedTotalTokens, getModelContextWindow);
       modelsToTry = contextFiltered.slice(0, MAX_FALLBACK_ATTEMPTS);
-      // Filter to models with accessible keys (direct or OpenRouter)
+      // Filter to accessible models
       modelsToTry = modelsToTry.filter((m) => isModelAccessible(options.apiKeys, m));
       modelsToTry = prioritizeNonRateLimited(modelsToTry);
     } else {
@@ -972,7 +877,7 @@ async function proxyRequest(
         // SSE can start with "data: ", "event: ", or ": " (comment/heartbeat)
         const isSSE = jsonStr.startsWith("data: ") || jsonStr.startsWith("event: ") || jsonStr.startsWith(": ");
         if (isSSE) {
-          // Already SSE format - filter out non-JSON lines (e.g. OpenRouter processing comments)
+          // Already SSE format - filter out non-JSON lines
           const cleaned = jsonStr
             .split("\n")
             .filter((line) => {
@@ -981,7 +886,7 @@ async function proxyRequest(
               if (trimmed === "") return true;
               if (trimmed === "data: [DONE]") return true;
               if (trimmed.startsWith("data: {")) return true;
-              // Drop SSE comments and non-JSON data lines (e.g. ": OPENROUTER PROCESSING")
+              // Drop SSE comments and non-JSON data lines
               return false;
             })
             .join("\n");

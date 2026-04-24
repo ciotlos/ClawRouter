@@ -1,10 +1,12 @@
 /**
  * Usage Logger
  *
- * Logs every LLM request as a JSON line to a daily log file.
- * Files: ~/.openclaw/blockrun/logs/usage-YYYY-MM-DD.jsonl
+ * Logs every routed request as a JSON line to a daily log file.
+ * Files: ~/.clawrouter/logs/usage-YYYY-MM-DD.jsonl
  *
- * MVP: append-only JSON lines. No rotation, no cleanup.
+ * Tracks token usage and which models handled which tiers,
+ * so you can see how the router is distributing your copilot workload.
+ *
  * Logging never breaks the request flow — all errors are swallowed.
  */
 
@@ -16,14 +18,17 @@ export type UsageEntry = {
   timestamp: string;
   model: string;
   tier: string;
+  /** Estimated cost in USD for this request */
   cost: number;
+  /** What it would have cost using the baseline model (Opus) */
   baselineCost: number;
-  savings: number; // 0-1 percentage
+  /** Savings ratio 0-1 vs baseline */
+  savings: number;
   latencyMs: number;
-  reasoning?: string; // Router classification reasoning (for debugging)
+  reasoning?: string;
 };
 
-const LOG_DIR = join(homedir(), ".openclaw", "clawrouter", "logs");
+const LOG_DIR = join(homedir(), ".clawrouter", "logs");
 let dirReady = false;
 
 async function ensureDir(): Promise<void> {

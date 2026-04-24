@@ -1,10 +1,12 @@
 /**
- * Default Routing Config
+ * Default Routing Config — Copilot Model Router
  *
  * All routing parameters as a TypeScript constant.
  * Operators override via openclaw.yaml plugin config.
  *
  * Scoring uses 14 weighted dimensions with sigmoid confidence calibration.
+ * Weights are tuned for copilot/coding tasks — code presence and agentic
+ * signals are boosted, creative markers are reduced.
  */
 
 import type { RoutingConfig } from "./types.js";
@@ -13,7 +15,7 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
   version: "2.0",
 
   classifier: {
-    llmModel: "google/gemini-2.5-flash",
+    llmModel: "gemini-3-flash",
     llmMaxTokens: 10,
     llmTemperature: 0,
     promptTruncationChars: 500,
@@ -601,23 +603,23 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       "验证",
     ],
 
-    // Dimension weights (sum to 1.0)
+    // Dimension weights (sum to 1.0) — tuned for copilot routing
     dimensionWeights: {
-      tokenCount: 0.08,
-      codePresence: 0.15,
-      reasoningMarkers: 0.18,
-      technicalTerms: 0.1,
-      creativeMarkers: 0.05,
-      simpleIndicators: 0.02, // Reduced from 0.12 to make room for agenticTask
+      tokenCount: 0.06,
+      codePresence: 0.20, // Boosted — code signals are primary for copilot routing
+      reasoningMarkers: 0.15,
+      technicalTerms: 0.12,
+      creativeMarkers: 0.02, // Reduced — less relevant for copilot
+      simpleIndicators: 0.02,
       multiStepPatterns: 0.12,
-      questionComplexity: 0.05,
-      imperativeVerbs: 0.03,
+      questionComplexity: 0.04,
+      imperativeVerbs: 0.05, // Boosted — "build", "implement", "create" are core copilot verbs
       constraintCount: 0.04,
       outputFormat: 0.03,
-      referenceComplexity: 0.02,
+      referenceComplexity: 0.03,
       negationComplexity: 0.01,
       domainSpecificity: 0.02,
-      agenticTask: 0.04, // Reduced - agentic signals influence tier selection, not dominate it
+      agenticTask: 0.09, // Boosted — agentic coding tasks need strong model selection
     },
 
     // Tier boundaries on weighted score axis
@@ -633,46 +635,47 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
     confidenceThreshold: 0.7,
   },
 
+  // Copilot-optimized tiers — routes to the best coding model per task complexity
   tiers: {
     SIMPLE: {
-      primary: "google/gemini-2.5-flash",
-      fallback: ["nvidia/gpt-oss-120b", "deepseek/deepseek-chat", "openai/gpt-4o-mini"],
+      primary: "grok-code-fast-1", // Fast code completions, inline suggestions
+      fallback: ["gemini-3-flash", "gpt-4.1", "gpt-5-mini"],
     },
     MEDIUM: {
-      primary: "xai/grok-code-fast-1", // Code specialist, $0.20/$1.50
+      primary: "claude-sonnet-4.6", // Strong code gen, refactoring, explanations
       fallback: [
-        "deepseek/deepseek-chat",
-        "xai/grok-4-fast-non-reasoning",
-        "google/gemini-2.5-flash",
+        "grok-code-fast-1",
+        "gpt-4.1",
+        "gemini-3-flash",
       ],
     },
     COMPLEX: {
-      primary: "google/gemini-2.5-pro",
-      fallback: ["anthropic/claude-sonnet-4", "xai/grok-4-0709", "openai/gpt-4o"],
+      primary: "claude-opus-4.6", // Best quality for multi-file edits, architecture, debugging
+      fallback: ["claude-sonnet-4.6", "gemini-3.1-pro", "gpt-5.4"],
     },
     REASONING: {
-      primary: "xai/grok-4-fast-reasoning", // Ultra-cheap reasoning $0.20/$0.50
-      fallback: ["deepseek/deepseek-reasoner", "moonshot/kimi-k2.5", "google/gemini-2.5-pro"],
+      primary: "gemini-3.1-pro", // 1M context, algorithm design, complex debugging
+      fallback: ["claude-opus-4.6", "gpt-5.4", "o3"],
     },
   },
 
-  // Agentic tier configs - models that excel at multi-step autonomous tasks
+  // Agentic copilot tiers — models that excel at multi-step autonomous coding tasks
   agenticTiers: {
     SIMPLE: {
-      primary: "anthropic/claude-haiku-4.5",
-      fallback: ["moonshot/kimi-k2.5", "xai/grok-4-fast-non-reasoning", "openai/gpt-4o-mini"],
+      primary: "claude-haiku-4.5", // Quick agentic file reads, lookups
+      fallback: ["grok-code-fast-1", "gpt-5-mini", "gpt-4.1"],
     },
     MEDIUM: {
-      primary: "xai/grok-code-fast-1", // Code specialist for agentic coding
-      fallback: ["moonshot/kimi-k2.5", "anthropic/claude-haiku-4.5", "anthropic/claude-sonnet-4"],
+      primary: "claude-sonnet-4.6", // Agentic code edits, test writing
+      fallback: ["gpt-5.3-codex", "grok-code-fast-1", "gemini-3-flash"],
     },
     COMPLEX: {
-      primary: "google/gemini-2.5-pro", // 1M context, strong tool use, ~60% cheaper than Sonnet
-      fallback: ["anthropic/claude-sonnet-4", "xai/grok-4-0709", "openai/gpt-4o"],
+      primary: "claude-opus-4.6", // Best agentic model — multi-step refactors, cross-file changes
+      fallback: ["claude-sonnet-4.6", "gpt-5.3-codex", "gemini-3.1-pro"],
     },
     REASONING: {
-      primary: "anthropic/claude-sonnet-4", // Strong tool use + reasoning for agentic tasks
-      fallback: ["xai/grok-4-fast-reasoning", "moonshot/kimi-k2.5", "deepseek/deepseek-reasoner"],
+      primary: "gemini-3.1-pro", // 1M context for large codebase reasoning
+      fallback: ["claude-opus-4.6", "gpt-5.4", "o3"],
     },
   },
 

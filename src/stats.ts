@@ -1,8 +1,10 @@
 /**
- * Usage Statistics Aggregator
+ * Usage Statistics — Copilot Router
  *
- * Reads usage log files and aggregates statistics for terminal display.
- * Supports filtering by date range and provides multiple aggregation views.
+ * Reads usage log files and aggregates statistics.
+ * Shows how the router distributed your copilot workload:
+ * which tiers handled what, which models were used, and
+ * how much you saved vs sending everything to a single premium model.
  */
 
 import { readFile, readdir } from "node:fs/promises";
@@ -10,7 +12,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import type { UsageEntry } from "./logger.js";
 
-const LOG_DIR = join(homedir(), ".openclaw", "clawrouter", "logs");
+const LOG_DIR = join(homedir(), ".clawrouter", "logs");
 
 export type DailyStats = {
   date: string;
@@ -39,7 +41,6 @@ export type AggregatedStats = {
 
 /**
  * Parse a JSONL log file into usage entries.
- * Handles both old format (without tier/baselineCost) and new format.
  */
 async function parseLogFile(filePath: string): Promise<UsageEntry[]> {
   try {
@@ -47,7 +48,6 @@ async function parseLogFile(filePath: string): Promise<UsageEntry[]> {
     const lines = content.trim().split("\n").filter(Boolean);
     return lines.map((line) => {
       const entry = JSON.parse(line) as Partial<UsageEntry>;
-      // Handle old format entries
       return {
         timestamp: entry.timestamp || new Date().toISOString(),
         model: entry.model || "unknown",
@@ -87,12 +87,10 @@ function aggregateDay(date: string, entries: UsageEntry[]): DailyStats {
   let totalLatency = 0;
 
   for (const entry of entries) {
-    // By tier
     if (!byTier[entry.tier]) byTier[entry.tier] = { count: 0, cost: 0 };
     byTier[entry.tier].count++;
     byTier[entry.tier].cost += entry.cost;
 
-    // By model
     if (!byModel[entry.model]) byModel[entry.model] = { count: 0, cost: 0 };
     byModel[entry.model].count++;
     byModel[entry.model].cost += entry.cost;
@@ -145,14 +143,12 @@ export async function getStats(days: number = 7): Promise<AggregatedStats> {
     totalBaselineCost += dayStats.totalBaselineCost;
     totalLatency += dayStats.avgLatencyMs * dayStats.totalRequests;
 
-    // Merge tier stats
     for (const [tier, stats] of Object.entries(dayStats.byTier)) {
       if (!allByTier[tier]) allByTier[tier] = { count: 0, cost: 0 };
       allByTier[tier].count += stats.count;
       allByTier[tier].cost += stats.cost;
     }
 
-    // Merge model stats
     for (const [model, stats] of Object.entries(dayStats.byModel)) {
       if (!allByModel[model]) allByModel[model] = { count: 0, cost: 0 };
       allByModel[model].count += stats.count;
@@ -160,9 +156,7 @@ export async function getStats(days: number = 7): Promise<AggregatedStats> {
     }
   }
 
-  // Calculate percentages
-  const byTierWithPercentage: Record<string, { count: number; cost: number; percentage: number }> =
-    {};
+  const byTierWithPercentage: Record<string, { count: number; cost: number; percentage: number }> = {};
   for (const [tier, stats] of Object.entries(allByTier)) {
     byTierWithPercentage[tier] = {
       ...stats,
@@ -170,8 +164,7 @@ export async function getStats(days: number = 7): Promise<AggregatedStats> {
     };
   }
 
-  const byModelWithPercentage: Record<string, { count: number; cost: number; percentage: number }> =
-    {};
+  const byModelWithPercentage: Record<string, { count: number; cost: number; percentage: number }> = {};
   for (const [model, stats] of Object.entries(allByModel)) {
     byModelWithPercentage[model] = {
       ...stats,
@@ -193,70 +186,88 @@ export async function getStats(days: number = 7): Promise<AggregatedStats> {
     avgCostPerRequest: totalRequests > 0 ? totalCost / totalRequests : 0,
     byTier: byTierWithPercentage,
     byModel: byModelWithPercentage,
-    dailyBreakdown: dailyBreakdown.reverse(), // Oldest first for charts
+    dailyBreakdown: dailyBreakdown.reverse(),
   };
 }
 
 /**
- * Format stats as ASCII table for terminal display.
+ * Format stats for terminal display.
+ *
+ * Shows copilot-friendly metrics:
+ * - Requests routed by tier (how your coding tasks break down)
+ * - Which models handled what (where your tokens went)
+ * - Cost vs sending everything to Opus (what you saved)
  */
 export function formatStatsAscii(stats: AggregatedStats): string {
   const lines: string[] = [];
 
-  // Header
   lines.push("╔════════════════════════════════════════════════════════════╗");
-  lines.push("║              ClawRouter Usage Statistics                   ║");
+  lines.push("║              ClawRouter — Copilot Stats                    ║");
   lines.push("╠════════════════════════════════════════════════════════════╣");
 
-  // Summary
   lines.push(`║  Period: ${stats.period.padEnd(49)}║`);
-  lines.push(`║  Total Requests: ${stats.totalRequests.toString().padEnd(41)}║`);
-  lines.push(`║  Total Cost: $${stats.totalCost.toFixed(4).padEnd(43)}║`);
-  lines.push(`║  Baseline Cost (Opus): $${stats.totalBaselineCost.toFixed(4).padEnd(33)}║`);
-  lines.push(
-    `║  💰 Total Saved: $${stats.totalSavings.toFixed(4)} (${stats.savingsPercentage.toFixed(1)}%)`.padEnd(
-      61,
-    ) + "║",
-  );
-  lines.push(`║  Avg Latency: ${stats.avgLatencyMs.toFixed(0)}ms`.padEnd(61) + "║");
+  lines.push(`║  Requests routed: ${stats.totalRequests.toString().padEnd(40)}║`);
 
-  // Tier breakdown
+  // Cost breakdown — show actual vs "if you used Opus for everything"
+  const actualStr = `$${stats.totalCost.toFixed(2)}`;
+  const baselineStr = `$${stats.totalBaselineCost.toFixed(2)}`;
+  const savedStr = `$${stats.totalSavings.toFixed(2)}`;
+  const pctStr = `${stats.savingsPercentage.toFixed(0)}%`;
+
+  lines.push(`║  Actual cost: ${actualStr.padEnd(44)}║`);
+  lines.push(`║  If all Opus: ${baselineStr.padEnd(44)}║`);
+  lines.push(`║  You saved:   ${savedStr} (${pctStr})`.padEnd(61) + "║");
+
+  if (stats.totalRequests > 0) {
+    const avgStr = `$${stats.avgCostPerRequest.toFixed(4)}/req`;
+    lines.push(`║  Avg cost:    ${avgStr.padEnd(44)}║`);
+  }
+
+  // Tier breakdown — shows how your coding tasks distribute
   lines.push("╠════════════════════════════════════════════════════════════╣");
-  lines.push("║  Routing by Tier:                                          ║");
+  lines.push("║  Task distribution:                                        ║");
+
+  const tierLabels: Record<string, string> = {
+    SIMPLE: "Quick",
+    MEDIUM: "Standard",
+    COMPLEX: "Complex",
+    REASONING: "Reasoning",
+  };
 
   const tierOrder = ["SIMPLE", "MEDIUM", "COMPLEX", "REASONING"];
   for (const tier of tierOrder) {
     const data = stats.byTier[tier];
     if (data) {
+      const label = (tierLabels[tier] || tier).padEnd(10);
       const bar = "█".repeat(Math.min(20, Math.round(data.percentage / 5)));
-      const line = `║    ${tier.padEnd(10)} ${bar.padEnd(20)} ${data.percentage.toFixed(1).padStart(5)}% (${data.count})`;
+      const line = `║    ${label} ${bar.padEnd(20)} ${data.percentage.toFixed(0).padStart(3)}% (${data.count} reqs)`;
       lines.push(line.padEnd(61) + "║");
     }
   }
 
-  // Top models
+  // Model breakdown — where your tokens actually went
   lines.push("╠════════════════════════════════════════════════════════════╣");
-  lines.push("║  Top Models:                                               ║");
+  lines.push("║  Models used:                                              ║");
 
   const sortedModels = Object.entries(stats.byModel)
     .sort((a, b) => b[1].count - a[1].count)
-    .slice(0, 5);
+    .slice(0, 6);
 
   for (const [model, data] of sortedModels) {
-    const shortModel = model.length > 25 ? model.slice(0, 22) + "..." : model;
-    const line = `║    ${shortModel.padEnd(25)} ${data.count.toString().padStart(5)} reqs  $${data.cost.toFixed(4)}`;
+    const shortModel = model.length > 28 ? model.slice(0, 25) + "..." : model;
+    const line = `║    ${shortModel.padEnd(28)} ${data.count.toString().padStart(4)} reqs  $${data.cost.toFixed(2)}`;
     lines.push(line.padEnd(61) + "║");
   }
 
-  // Daily breakdown (last 7 days)
-  if (stats.dailyBreakdown.length > 0) {
+  // Daily breakdown
+  if (stats.dailyBreakdown.length > 1) {
     lines.push("╠════════════════════════════════════════════════════════════╣");
-    lines.push("║  Daily Breakdown:                                          ║");
-    lines.push("║    Date        Requests    Cost      Saved                 ║");
+    lines.push("║  Daily:                                                    ║");
+    lines.push("║    Date         Reqs     Cost     Saved                    ║");
 
     for (const day of stats.dailyBreakdown.slice(-7)) {
       const saved = day.totalBaselineCost - day.totalCost;
-      const line = `║    ${day.date}   ${day.totalRequests.toString().padStart(6)}    $${day.totalCost.toFixed(4).padStart(8)}  $${saved.toFixed(4)}`;
+      const line = `║    ${day.date}   ${day.totalRequests.toString().padStart(5)}   $${day.totalCost.toFixed(2).padStart(7)}  $${saved.toFixed(2)}`;
       lines.push(line.padEnd(61) + "║");
     }
   }

@@ -1,54 +1,43 @@
 /**
- * BlockRun Model Definitions for OpenClaw
+ * Copilot Model Definitions
  *
- * Maps BlockRun's 30+ AI models to OpenClaw's ModelDefinitionConfig format.
- * All models use the "openai-completions" API since BlockRun is OpenAI-compatible.
+ * Models available through the GitHub Copilot API.
+ * These are the models the router can select from when classifying
+ * coding tasks into tiers.
  *
- * Pricing is in USD per 1M tokens. Operators pay these rates via x402;
- * they set their own markup when reselling to end users (Phase 2).
+ * Model list based on GitHub Copilot supported models documentation:
+ * https://docs.github.com/copilot/reference/ai-models/supported-models
+ *
+ * Pricing is in USD per 1M tokens (used for cost tracking / savings display).
  */
 
 import type { ModelDefinitionConfig, ModelProviderConfig } from "./types.js";
 
 /**
  * Model aliases for convenient shorthand access.
- * Users can type `/model claude` instead of `/model blockrun/anthropic/claude-sonnet-4`.
+ * Users can set model to "sonnet" instead of "claude-sonnet-4".
  */
 export const MODEL_ALIASES: Record<string, string> = {
   // Claude
-  claude: "anthropic/claude-sonnet-4",
-  sonnet: "anthropic/claude-sonnet-4",
-  opus: "anthropic/claude-opus-4",
-  haiku: "anthropic/claude-haiku-4.5",
+  claude: "claude-sonnet-4.6",
+  sonnet: "claude-sonnet-4.6",
+  opus: "claude-opus-4.6",
+  haiku: "claude-haiku-4.5",
 
   // OpenAI
-  gpt: "openai/gpt-4o",
-  gpt4: "openai/gpt-4o",
-  gpt5: "openai/gpt-5.2",
-  mini: "openai/gpt-4o-mini",
-  o3: "openai/o3",
-
-  // DeepSeek
-  deepseek: "deepseek/deepseek-chat",
-  reasoner: "deepseek/deepseek-reasoner",
-
-  // Kimi / Moonshot
-  kimi: "moonshot/kimi-k2.5",
+  gpt: "gpt-4.1",
+  gpt5: "gpt-5.4",
+  mini: "gpt-5-mini",
+  codex: "gpt-5.3-codex",
+  o3: "o3",
 
   // Google
-  gemini: "google/gemini-2.5-pro",
-  flash: "google/gemini-2.5-flash",
+  gemini: "gemini-3.1-pro",
+  flash: "gemini-3-flash",
 
   // xAI
-  grok: "xai/grok-3",
-  "grok-fast": "xai/grok-4-fast-reasoning",
-  "grok-code": "xai/grok-code-fast-1",
-
-  // NVIDIA (free)
-  nvidia: "nvidia/gpt-oss-120b",
-  "gpt-120b": "nvidia/gpt-oss-120b",
-  "gpt-20b": "nvidia/gpt-oss-20b",
-  free: "nvidia/gpt-oss-120b",
+  grok: "grok-code-fast-1",
+  "grok-code": "grok-code-fast-1",
 };
 
 /**
@@ -59,20 +48,10 @@ export function resolveModelAlias(model: string): string {
   const normalized = model.trim().toLowerCase();
   const resolved = MODEL_ALIASES[normalized];
   if (resolved) return resolved;
-
-  // Check with "blockrun/" or "clawrouter/" prefix stripped
-  for (const prefix of ["blockrun/", "clawrouter/"]) {
-    if (normalized.startsWith(prefix)) {
-      const withoutPrefix = normalized.slice(prefix.length);
-      const resolvedWithoutPrefix = MODEL_ALIASES[withoutPrefix];
-      if (resolvedWithoutPrefix) return resolvedWithoutPrefix;
-    }
-  }
-
   return model;
 }
 
-type BlockRunModel = {
+type CopilotModel = {
   id: string;
   name: string;
   inputPrice: number;
@@ -85,59 +64,26 @@ type BlockRunModel = {
   agentic?: boolean;
 };
 
-export const BLOCKRUN_MODELS: BlockRunModel[] = [
+/**
+ * Models available through the GitHub Copilot API.
+ *
+ * IDs match what the Copilot API expects — no provider prefix needed.
+ */
+export const COPILOT_MODELS: CopilotModel[] = [
   // Smart routing meta-model — proxy replaces with actual model
-  // NOTE: Model IDs are WITHOUT provider prefix (OpenClaw adds "blockrun/" automatically)
   {
     id: "auto",
-    name: "BlockRun Smart Router",
+    name: "ClawRouter Auto",
     inputPrice: 0,
     outputPrice: 0,
     contextWindow: 1_050_000,
     maxOutput: 128_000,
   },
 
-  // OpenAI GPT-5 Family
-  {
-    id: "openai/gpt-5.2",
-    name: "GPT-5.2",
-    inputPrice: 1.75,
-    outputPrice: 14.0,
-    contextWindow: 400000,
-    maxOutput: 128000,
-    reasoning: true,
-    vision: true,
-    agentic: true,
-  },
-  {
-    id: "openai/gpt-5-mini",
-    name: "GPT-5 Mini",
-    inputPrice: 0.25,
-    outputPrice: 2.0,
-    contextWindow: 200000,
-    maxOutput: 65536,
-  },
-  {
-    id: "openai/gpt-5-nano",
-    name: "GPT-5 Nano",
-    inputPrice: 0.05,
-    outputPrice: 0.4,
-    contextWindow: 128000,
-    maxOutput: 32768,
-  },
-  {
-    id: "openai/gpt-5.2-pro",
-    name: "GPT-5.2 Pro",
-    inputPrice: 21.0,
-    outputPrice: 168.0,
-    contextWindow: 400000,
-    maxOutput: 128000,
-    reasoning: true,
-  },
+  // --- OpenAI ---
 
-  // OpenAI GPT-4 Family
   {
-    id: "openai/gpt-4.1",
+    id: "gpt-4.1",
     name: "GPT-4.1",
     inputPrice: 2.0,
     outputPrice: 8.0,
@@ -146,61 +92,65 @@ export const BLOCKRUN_MODELS: BlockRunModel[] = [
     vision: true,
   },
   {
-    id: "openai/gpt-4.1-mini",
-    name: "GPT-4.1 Mini",
-    inputPrice: 0.4,
-    outputPrice: 1.6,
-    contextWindow: 128000,
-    maxOutput: 16384,
-  },
-  {
-    id: "openai/gpt-4.1-nano",
-    name: "GPT-4.1 Nano",
-    inputPrice: 0.1,
-    outputPrice: 0.4,
-    contextWindow: 128000,
-    maxOutput: 16384,
-  },
-  {
-    id: "openai/gpt-4o",
-    name: "GPT-4o",
-    inputPrice: 2.5,
-    outputPrice: 10.0,
-    contextWindow: 128000,
-    maxOutput: 16384,
+    id: "gpt-5-mini",
+    name: "GPT-5 Mini",
+    inputPrice: 0.25,
+    outputPrice: 2.0,
+    contextWindow: 200000,
+    maxOutput: 65536,
+    reasoning: true,
     vision: true,
+  },
+  {
+    id: "gpt-5.2",
+    name: "GPT-5.2",
+    inputPrice: 1.75,
+    outputPrice: 14.0,
+    contextWindow: 400000,
+    maxOutput: 128000,
+    reasoning: true,
+    vision: true,
+  },
+  {
+    id: "gpt-5.2-codex",
+    name: "GPT-5.2 Codex",
+    inputPrice: 1.75,
+    outputPrice: 14.0,
+    contextWindow: 400000,
+    maxOutput: 128000,
+    reasoning: true,
     agentic: true,
   },
   {
-    id: "openai/gpt-4o-mini",
-    name: "GPT-4o Mini",
-    inputPrice: 0.15,
-    outputPrice: 0.6,
-    contextWindow: 128000,
-    maxOutput: 16384,
+    id: "gpt-5.3-codex",
+    name: "GPT-5.3 Codex",
+    inputPrice: 1.75,
+    outputPrice: 14.0,
+    contextWindow: 400000,
+    maxOutput: 128000,
+    reasoning: true,
+    agentic: true,
   },
-
-  // OpenAI O-series (Reasoning)
   {
-    id: "openai/o1",
-    name: "o1",
-    inputPrice: 15.0,
-    outputPrice: 60.0,
+    id: "gpt-5.4",
+    name: "GPT-5.4",
+    inputPrice: 2.0,
+    outputPrice: 16.0,
+    contextWindow: 400000,
+    maxOutput: 128000,
+    reasoning: true,
+  },
+  {
+    id: "gpt-5.4-mini",
+    name: "GPT-5.4 Mini",
+    inputPrice: 0.25,
+    outputPrice: 2.0,
     contextWindow: 200000,
-    maxOutput: 100000,
-    reasoning: true,
-  },
-  {
-    id: "openai/o1-mini",
-    name: "o1-mini",
-    inputPrice: 1.1,
-    outputPrice: 4.4,
-    contextWindow: 128000,
     maxOutput: 65536,
-    reasoning: true,
+    agentic: true,
   },
   {
-    id: "openai/o3",
+    id: "o3",
     name: "o3",
     inputPrice: 2.0,
     outputPrice: 8.0,
@@ -208,28 +158,11 @@ export const BLOCKRUN_MODELS: BlockRunModel[] = [
     maxOutput: 100000,
     reasoning: true,
   },
-  {
-    id: "openai/o3-mini",
-    name: "o3-mini",
-    inputPrice: 1.1,
-    outputPrice: 4.4,
-    contextWindow: 128000,
-    maxOutput: 65536,
-    reasoning: true,
-  },
-  {
-    id: "openai/o4-mini",
-    name: "o4-mini",
-    inputPrice: 1.1,
-    outputPrice: 4.4,
-    contextWindow: 128000,
-    maxOutput: 65536,
-    reasoning: true,
-  },
 
-  // Anthropic - all Claude models excel at agentic workflows
+  // --- Anthropic ---
+
   {
-    id: "anthropic/claude-haiku-4.5",
+    id: "claude-haiku-4.5",
     name: "Claude Haiku 4.5",
     inputPrice: 1.0,
     outputPrice: 5.0,
@@ -238,7 +171,7 @@ export const BLOCKRUN_MODELS: BlockRunModel[] = [
     agentic: true,
   },
   {
-    id: "anthropic/claude-sonnet-4",
+    id: "claude-sonnet-4",
     name: "Claude Sonnet 4",
     inputPrice: 3.0,
     outputPrice: 15.0,
@@ -248,39 +181,40 @@ export const BLOCKRUN_MODELS: BlockRunModel[] = [
     agentic: true,
   },
   {
-    id: "anthropic/claude-opus-4",
-    name: "Claude Opus 4",
-    inputPrice: 15.0,
-    outputPrice: 75.0,
+    id: "claude-sonnet-4.5",
+    name: "Claude Sonnet 4.5",
+    inputPrice: 3.0,
+    outputPrice: 15.0,
     contextWindow: 200000,
-    maxOutput: 32000,
+    maxOutput: 64000,
     reasoning: true,
     agentic: true,
   },
   {
-    id: "anthropic/claude-opus-4.5",
-    name: "Claude Opus 4.5",
-    inputPrice: 5.0,
-    outputPrice: 25.0,
+    id: "claude-sonnet-4.6",
+    name: "Claude Sonnet 4.6",
+    inputPrice: 3.0,
+    outputPrice: 15.0,
+    contextWindow: 200000,
+    maxOutput: 64000,
+    reasoning: true,
+    agentic: true,
+  },
+  {
+    id: "claude-opus-4.6",
+    name: "Claude Opus 4.6",
+    inputPrice: 10.0,
+    outputPrice: 50.0,
     contextWindow: 200000,
     maxOutput: 32000,
     reasoning: true,
     agentic: true,
   },
 
-  // Google
+  // --- Google ---
+
   {
-    id: "google/gemini-3-pro-preview",
-    name: "Gemini 3 Pro Preview",
-    inputPrice: 2.0,
-    outputPrice: 12.0,
-    contextWindow: 1050000,
-    maxOutput: 65536,
-    reasoning: true,
-    vision: true,
-  },
-  {
-    id: "google/gemini-2.5-pro",
+    id: "gemini-2.5-pro",
     name: "Gemini 2.5 Pro",
     inputPrice: 1.25,
     outputPrice: 10.0,
@@ -290,168 +224,45 @@ export const BLOCKRUN_MODELS: BlockRunModel[] = [
     vision: true,
   },
   {
-    id: "google/gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
+    id: "gemini-3-flash",
+    name: "Gemini 3 Flash",
     inputPrice: 0.15,
     outputPrice: 0.6,
     contextWindow: 1000000,
     maxOutput: 65536,
   },
-
-  // DeepSeek
   {
-    id: "deepseek/deepseek-chat",
-    name: "DeepSeek V3.2 Chat",
-    inputPrice: 0.28,
-    outputPrice: 0.42,
-    contextWindow: 128000,
-    maxOutput: 8192,
-  },
-  {
-    id: "deepseek/deepseek-reasoner",
-    name: "DeepSeek V3.2 Reasoner",
-    inputPrice: 0.28,
-    outputPrice: 0.42,
-    contextWindow: 128000,
-    maxOutput: 8192,
-    reasoning: true,
-  },
-
-  // Moonshot / Kimi - optimized for agentic workflows
-  {
-    id: "moonshot/kimi-k2.5",
-    name: "Kimi K2.5",
-    inputPrice: 0.5,
-    outputPrice: 2.4,
-    contextWindow: 262144,
-    maxOutput: 8192,
+    id: "gemini-3.1-pro",
+    name: "Gemini 3.1 Pro",
+    inputPrice: 2.0,
+    outputPrice: 12.0,
+    contextWindow: 1050000,
+    maxOutput: 65536,
     reasoning: true,
     vision: true,
-    agentic: true,
   },
 
-  // xAI / Grok
-  {
-    id: "xai/grok-3",
-    name: "Grok 3",
-    inputPrice: 3.0,
-    outputPrice: 15.0,
-    contextWindow: 131072,
-    maxOutput: 16384,
-    reasoning: true,
-  },
-  {
-    id: "xai/grok-3-fast",
-    name: "Grok 3 Fast",
-    inputPrice: 5.0,
-    outputPrice: 25.0,
-    contextWindow: 131072,
-    maxOutput: 16384,
-    reasoning: true,
-  },
-  {
-    id: "xai/grok-3-mini",
-    name: "Grok 3 Mini",
-    inputPrice: 0.3,
-    outputPrice: 0.5,
-    contextWindow: 131072,
-    maxOutput: 16384,
-  },
+  // --- xAI ---
 
-  // xAI Grok 4 Family - Ultra-cheap fast models
   {
-    id: "xai/grok-4-fast-reasoning",
-    name: "Grok 4 Fast Reasoning",
-    inputPrice: 0.2,
-    outputPrice: 0.5,
-    contextWindow: 131072,
-    maxOutput: 16384,
-    reasoning: true,
-  },
-  {
-    id: "xai/grok-4-fast-non-reasoning",
-    name: "Grok 4 Fast",
-    inputPrice: 0.2,
-    outputPrice: 0.5,
-    contextWindow: 131072,
-    maxOutput: 16384,
-  },
-  {
-    id: "xai/grok-4-1-fast-reasoning",
-    name: "Grok 4.1 Fast Reasoning",
-    inputPrice: 0.2,
-    outputPrice: 0.5,
-    contextWindow: 131072,
-    maxOutput: 16384,
-    reasoning: true,
-  },
-  {
-    id: "xai/grok-4-1-fast-non-reasoning",
-    name: "Grok 4.1 Fast",
-    inputPrice: 0.2,
-    outputPrice: 0.5,
-    contextWindow: 131072,
-    maxOutput: 16384,
-  },
-  {
-    id: "xai/grok-code-fast-1",
+    id: "grok-code-fast-1",
     name: "Grok Code Fast",
     inputPrice: 0.2,
     outputPrice: 1.5,
     contextWindow: 131072,
     maxOutput: 16384,
-    agentic: true, // Good for coding tasks
-  },
-  {
-    id: "xai/grok-4-0709",
-    name: "Grok 4 (0709)",
-    inputPrice: 3.0,
-    outputPrice: 15.0,
-    contextWindow: 131072,
-    maxOutput: 16384,
-    reasoning: true,
-  },
-  {
-    id: "xai/grok-2-vision",
-    name: "Grok 2 Vision",
-    inputPrice: 2.0,
-    outputPrice: 10.0,
-    contextWindow: 131072,
-    maxOutput: 16384,
-    vision: true,
-  },
-
-  // NVIDIA - Free/cheap models
-  {
-    id: "nvidia/gpt-oss-120b",
-    name: "NVIDIA GPT-OSS 120B",
-    inputPrice: 0,
-    outputPrice: 0,
-    contextWindow: 128000,
-    maxOutput: 16384,
-  },
-  {
-    id: "nvidia/gpt-oss-20b",
-    name: "NVIDIA GPT-OSS 20B",
-    inputPrice: 0,
-    outputPrice: 0,
-    contextWindow: 128000,
-    maxOutput: 16384,
-  },
-  {
-    id: "nvidia/kimi-k2.5",
-    name: "NVIDIA Kimi K2.5",
-    inputPrice: 0.001,
-    outputPrice: 0.001,
-    contextWindow: 262144,
-    maxOutput: 16384,
+    agentic: true,
   },
 ];
 
+// Legacy alias — other files reference BLOCKRUN_MODELS
+export const BLOCKRUN_MODELS = COPILOT_MODELS;
+
 /**
- * Convert BlockRun model definitions to OpenClaw ModelDefinitionConfig format.
+ * Convert model definition to OpenClaw-compatible format.
+ * Kept for compatibility with proxy internals.
  */
-function toOpenClawModel(m: BlockRunModel): ModelDefinitionConfig {
+function toModelDef(m: CopilotModel): ModelDefinitionConfig {
   return {
     id: m.id,
     name: m.name,
@@ -470,29 +281,12 @@ function toOpenClawModel(m: BlockRunModel): ModelDefinitionConfig {
 }
 
 /**
- * Alias models that map to real models.
- * These allow users to use friendly names like "free" or "gpt-120b".
+ * All models in provider config format.
  */
-const ALIAS_MODELS: ModelDefinitionConfig[] = Object.entries(MODEL_ALIASES)
-  .map(([alias, targetId]) => {
-    const target = BLOCKRUN_MODELS.find((m) => m.id === targetId);
-    if (!target) return null;
-    return toOpenClawModel({ ...target, id: alias, name: `${alias} → ${target.name}` });
-  })
-  .filter((m): m is ModelDefinitionConfig => m !== null);
+export const OPENCLAW_MODELS: ModelDefinitionConfig[] = COPILOT_MODELS.map(toModelDef);
 
 /**
- * All BlockRun models in OpenClaw format (including aliases).
- */
-export const OPENCLAW_MODELS: ModelDefinitionConfig[] = [
-  ...BLOCKRUN_MODELS.map(toOpenClawModel),
-  ...ALIAS_MODELS,
-];
-
-/**
- * Build a ModelProviderConfig for BlockRun.
- *
- * @param baseUrl - The proxy's local base URL (e.g., "http://127.0.0.1:12345")
+ * Build a provider config pointing at the local proxy.
  */
 export function buildProviderModels(baseUrl: string): ModelProviderConfig {
   return {
@@ -504,13 +298,9 @@ export function buildProviderModels(baseUrl: string): ModelProviderConfig {
 
 /**
  * Check if a model is optimized for agentic workflows.
- * Agentic models continue autonomously with multi-step tasks
- * instead of stopping and waiting for user input.
  */
 export function isAgenticModel(modelId: string): boolean {
-  const model = BLOCKRUN_MODELS.find(
-    (m) => m.id === modelId || m.id === modelId.replace("blockrun/", ""),
-  );
+  const model = COPILOT_MODELS.find((m) => m.id === modelId);
   return model?.agentic ?? false;
 }
 
@@ -518,15 +308,13 @@ export function isAgenticModel(modelId: string): boolean {
  * Get all agentic-capable models.
  */
 export function getAgenticModels(): string[] {
-  return BLOCKRUN_MODELS.filter((m) => m.agentic).map((m) => m.id);
+  return COPILOT_MODELS.filter((m) => m.agentic).map((m) => m.id);
 }
 
 /**
  * Get context window size for a model.
- * Returns undefined if model not found.
  */
 export function getModelContextWindow(modelId: string): number | undefined {
-  const normalized = modelId.replace("blockrun/", "");
-  const model = BLOCKRUN_MODELS.find((m) => m.id === normalized);
+  const model = COPILOT_MODELS.find((m) => m.id === modelId);
   return model?.contextWindow;
 }

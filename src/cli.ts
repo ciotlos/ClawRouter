@@ -1,19 +1,23 @@
 #!/usr/bin/env node
 /**
- * ClawRouter CLI — Standalone proxy mode
+ * ClawRouter CLI — Copilot Model Router
  *
  * Usage:
- *   npx clawrouter              # Start standalone proxy
- *   npx clawrouter --version    # Show version
+ *   clawrouter              # Start the router (authenticates via GitHub)
+ *   clawrouter --version    # Show version
  */
 
 import { startProxy, getProxyPort } from "./proxy.js";
-import { loadApiKeys, getConfiguredProviders, hasOpenRouter, getAccessibleProviders } from "./api-keys.js";
+import { createLiveApiKeys, getConfiguredProviders } from "./api-keys.js";
+import { getCopilotToken, startTokenRefresh, stopTokenRefresh } from "./copilot-auth.js";
 import { VERSION } from "./version.js";
 
 function printHelp(): void {
   console.log(`
-ClawRouter v${VERSION} - Smart LLM Router (Direct API Keys)
+ClawRouter v${VERSION} — Copilot Model Router
+
+Routes every coding request to the best model for the task.
+Fast completions get a fast model, complex refactors get a strong one.
 
 Usage:
   clawrouter [options]
@@ -23,27 +27,26 @@ Options:
   --help, -h        Show this help message
   --port <number>   Port to listen on (default: ${getProxyPort()})
 
-Examples:
-  # Set API keys and start
-  export OPENAI_API_KEY=sk-...
-  export ANTHROPIC_API_KEY=sk-ant-...
-  npx clawrouter
+Point your editor/copilot at http://127.0.0.1:<port>/v1 as an
+OpenAI-compatible endpoint, using model "auto" for smart routing.
 
-  # Custom port
-  npx clawrouter --port 9000
+Authentication:
+  ClawRouter uses your GitHub account via OAuth device flow.
+  On first run, you'll be asked to visit github.com/login/device
+  and enter a code. After that, the token is saved and refreshed
+  automatically.
+
+  You can also set GH_TOKEN or COPILOT_GITHUB_TOKEN env var
+  to skip the interactive flow.
+
+Examples:
+  clawrouter                  # Start (authenticates on first run)
+  clawrouter --port 9000      # Custom port
 
 Environment Variables:
-  OPENROUTER_API_KEY    OpenRouter key (one key → all models!)
-  OPENAI_API_KEY        OpenAI API key (direct, cheaper)
-  ANTHROPIC_API_KEY     Anthropic API key (direct, cheaper)
-  GOOGLE_API_KEY        Google AI API key (direct, cheaper)
-  XAI_API_KEY           xAI/Grok API key (direct, cheaper)
-  DEEPSEEK_API_KEY      DeepSeek API key (direct, cheaper)
-  MOONSHOT_API_KEY      Moonshot/Kimi API key (direct, cheaper)
-  NVIDIA_API_KEY        NVIDIA API key (direct, cheaper)
-  CLAWROUTER_PORT       Default proxy port (default: 8402)
-
-  Direct keys take priority over OpenRouter for that provider's models.
+  COPILOT_GITHUB_TOKEN  GitHub token with copilot scope
+  GH_TOKEN              GitHub CLI token (fallback)
+  CLAWROUTER_PORT       Proxy port (default: 8402)
 `);
 }
 
@@ -63,41 +66,42 @@ async function main(): Promise<void> {
   if (args.version) { console.log(VERSION); process.exit(0); }
   if (args.help) { printHelp(); process.exit(0); }
 
-  const apiKeys = loadApiKeys();
-  const configured = getConfiguredProviders(apiKeys);
-
-  if (configured.length === 0) {
-    console.error("[ClawRouter] No API keys configured!");
-    console.error("[ClawRouter] Quickest: export OPENROUTER_API_KEY=sk-or-...  (one key → all models)");
-    console.error("[ClawRouter] Or set individual keys: OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.");
-    console.error("[ClawRouter] Or edit ~/.openclaw/clawrouter/config.json");
+  // Authenticate with GitHub Copilot
+  console.log("[ClawRouter] Authenticating with GitHub Copilot...");
+  try {
+    await getCopilotToken();
+  } catch (err) {
+    console.error(`[ClawRouter] Authentication failed: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }
 
-  const accessible = getAccessibleProviders(apiKeys);
-  const orFallback = hasOpenRouter(apiKeys);
-  console.log(`[ClawRouter] Configured providers: ${configured.join(", ")}${orFallback ? " (OpenRouter covers all)" : ""}`);
-  console.log(`[ClawRouter] Accessible providers: ${accessible.join(", ")} (${accessible.length} total)`);
+  // Start background token refresh
+  startTokenRefresh();
+
+  // Create live API keys config (always reads latest token)
+  const apiKeys = createLiveApiKeys();
+  const configured = getConfiguredProviders(apiKeys);
+  console.log(`[ClawRouter] Authenticated (${configured.length} provider)`);
 
   const proxy = await startProxy({
     apiKeys,
     port: args.port,
     onReady: (port) => {
-      console.log(`[ClawRouter] Proxy listening on http://127.0.0.1:${port}`);
-      console.log(`[ClawRouter] Health check: http://127.0.0.1:${port}/health`);
+      console.log(`[ClawRouter] Copilot router listening on http://127.0.0.1:${port}/v1`);
+      console.log(`[ClawRouter] Use model "auto" for smart routing`);
     },
     onError: (error) => console.error(`[ClawRouter] Error: ${error.message}`),
     onRouted: (decision) => {
-      const cost = decision.costEstimate.toFixed(4);
-      const saved = (decision.savings * 100).toFixed(0);
-      console.log(`[ClawRouter] [${decision.tier}] ${decision.model} ~$${cost} (saved ${saved}%)`);
+      const tier = decision.tier.padEnd(9);
+      console.log(`[ClawRouter] ${tier} → ${decision.model} (confidence=${decision.confidence.toFixed(2)})`);
     },
   });
 
-  console.log(`[ClawRouter] Ready - Ctrl+C to stop`);
+  console.log(`[ClawRouter] Ready — Ctrl+C to stop`);
 
   const shutdown = async (signal: string) => {
     console.log(`\n[ClawRouter] Received ${signal}, shutting down...`);
+    stopTokenRefresh();
     try { await proxy.close(); process.exit(0); } catch { process.exit(1); }
   };
 
