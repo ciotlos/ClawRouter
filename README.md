@@ -12,10 +12,10 @@ Routes every coding request to the best model for the task. Simple completions g
 
 | Tier | What it handles | Default Model | Multiplier |
 |---|---|---|---|
-| **SIMPLE** | Inline completions, lookups, short answers | Grok Code Fast | 0.33x |
+| **SIMPLE** | Inline completions, lookups, short answers | GPT-4o | 0x (free) |
 | **MEDIUM** | Code generation, refactoring, explanations | Claude Sonnet 4.6 | 1x |
 | **COMPLEX** | Multi-file edits, architecture, debugging | Claude Opus 4.6 | 3x |
-| **REASONING** | Algorithm design, proofs, complex debugging | Gemini 3.1 Pro | 1x |
+| **REASONING** | Algorithm design, proofs, complex debugging | GPT-5.4 | 1x |
 
 ## Quick Start
 

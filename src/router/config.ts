@@ -145,43 +145,43 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
     confidenceThreshold: 0.7,
   },
 
-  // Copilot-optimized tiers — balanced for quality AND premium request budget
-  // Multipliers: 0x (free), 0.33x (bargain), 1x (standard), 3x (premium), 7.5x+ (extreme)
+  // Tier model assignments — only models verified against api.githubcopilot.com/models
+  // Multipliers: 0x (gpt-4.1, gpt-5-mini, gpt-4o), 0.33x (haiku), 1x (sonnet, gpt-5.4), 3x (opus)
   tiers: {
     SIMPLE: {
-      primary: "grok-code-fast-1",
-      fallback: ["gemini-3-flash", "gpt-4.1", "gpt-5-mini"],
+      primary: "gpt-4o",
+      fallback: ["gpt-4.1", "gpt-5-mini", "claude-haiku-4.5"],
     },
     MEDIUM: {
       primary: "claude-sonnet-4.6",
-      fallback: ["grok-code-fast-1", "gpt-4.1", "gemini-3-flash"],
+      fallback: ["gpt-5.4", "gpt-4.1", "gpt-4o"],
     },
     COMPLEX: {
       primary: "claude-opus-4.6",
-      fallback: ["gpt-5.4", "gemini-3.1-pro", "claude-sonnet-4.6"],
+      fallback: ["gpt-5.4", "claude-sonnet-4.6", "gpt-5.2"],
     },
     REASONING: {
-      primary: "gemini-3.1-pro",
-      fallback: ["gpt-5.4", "claude-sonnet-4.6", "o3"],
+      primary: "gpt-5.4",
+      fallback: ["claude-sonnet-4.6", "gpt-5.2", "gpt-5-mini"],
     },
   },
 
   agenticTiers: {
     SIMPLE: {
       primary: "claude-haiku-4.5",
-      fallback: ["grok-code-fast-1", "gpt-5-mini", "gpt-4.1"],
+      fallback: ["gpt-4o", "gpt-5-mini", "gpt-4.1"],
     },
     MEDIUM: {
       primary: "claude-sonnet-4.6",
-      fallback: ["gpt-5.3-codex", "grok-code-fast-1", "gemini-3-flash"],
+      fallback: ["gpt-5.3-codex", "gpt-4.1", "gpt-4o"],
     },
     COMPLEX: {
       primary: "claude-opus-4.6",
       fallback: ["gpt-5.4", "gpt-5.3-codex", "claude-sonnet-4.6"],
     },
     REASONING: {
-      primary: "gemini-3.1-pro",
-      fallback: ["gpt-5.4", "claude-sonnet-4.6", "o3"],
+      primary: "gpt-5.4",
+      fallback: ["claude-sonnet-4.6", "gpt-5.2", "gpt-5-mini"],
     },
   },
 

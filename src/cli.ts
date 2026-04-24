@@ -83,6 +83,28 @@ async function main(): Promise<void> {
   const configured = getConfiguredProviders(apiKeys);
   console.log(`[ClawPilotRouter] Authenticated (${configured.length} provider)`);
 
+  // Discover available models from the Copilot API
+  try {
+    const token = apiKeys.providers.copilot?.apiKey;
+    if (token) {
+      const resp = await fetch("https://api.githubcopilot.com/models", {
+        headers: {
+          "authorization": `Bearer ${token}`,
+          "editor-version": "vscode/1.100.0",
+          "editor-plugin-version": "copilot-chat/0.26.0",
+          "copilot-integration-id": "vscode-chat",
+        },
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { data?: Array<{ id: string }> };
+        const apiModels = new Set((data.data ?? []).map((m: { id: string }) => m.id));
+        console.log(`[ClawPilotRouter] ${apiModels.size} models available from Copilot API`);
+      }
+    }
+  } catch {
+    // Non-critical — model discovery is informational
+  }
+
   const proxy = await startProxy({
     apiKeys,
     port: args.port,
