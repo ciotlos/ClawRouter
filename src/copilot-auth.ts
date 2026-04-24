@@ -247,3 +247,30 @@ export function stopTokenRefresh(): void {
 export function getCurrentToken(): string | null {
   return currentCopilotToken;
 }
+
+/**
+ * Force an immediate token refresh, bypassing the cache.
+ * Called when a 403 suggests the current token has expired mid-cycle.
+ * Returns true if a new token was obtained.
+ */
+export async function forceTokenRefresh(): Promise<boolean> {
+  const githubToken = loadGitHubToken();
+  if (!githubToken) return false;
+
+  try {
+    const exchanged = await tryTokenExchange(githubToken);
+    if (exchanged) {
+      currentCopilotToken = exchanged;
+      saveCopilotToken(exchanged);
+      console.log("[ClawPilotRouter] Token force-refreshed (exchange)");
+      return true;
+    }
+    // Exchange failed — fall back to raw GitHub token
+    currentCopilotToken = githubToken;
+    saveCopilotToken(githubToken);
+    return true;
+  } catch (err) {
+    console.error(`[ClawPilotRouter] Force token refresh failed: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
+}

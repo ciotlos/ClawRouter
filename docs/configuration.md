@@ -23,6 +23,33 @@ You can skip the interactive flow by setting a token:
 | `GITHUB_TOKEN` | GitHub Actions token (fallback) |
 | `CLAWPILOTROUTER_PORT` | Proxy port (default: 8402) |
 
+## Editor Setup (VS Code)
+
+ClawPilotRouter works with VS Code via the [Continue](https://continue.dev) extension (v1.x+), which supports custom OpenAI-compatible endpoints.
+
+1. Install the **Continue** extension from the VS Code marketplace
+2. Open `~/.continue/config.yaml` and add:
+
+```yaml
+name: My Config
+version: 0.0.1
+schema: v1
+
+models:
+  - name: ClawPilotRouter
+    provider: openai
+    model: auto
+    apiBase: http://127.0.0.1:8402/v1
+    apiKey: dummy
+```
+
+3. Start the router: `npx clawpilotrouter`
+4. Select **ClawPilotRouter** from Continue's model dropdown in the sidebar
+
+The `apiKey` value is a placeholder — the router handles authentication via your GitHub token. To pin a specific model instead of smart routing, replace `auto` with any model alias (e.g. `sonnet`, `opus`).
+
+> **Note:** If you're using a custom port (`--port 9000`), update the `apiBase` URL accordingly.
+
 ## Proxy Settings
 
 | Setting | Default | Env Variable |

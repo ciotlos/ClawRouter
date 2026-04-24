@@ -40,6 +40,7 @@ import { getStats } from "./stats.js";
 import { RequestDeduplicator } from "./dedup.js";
 import { USER_AGENT } from "./version.js";
 import { SessionStore, getSessionId, type SessionConfig } from "./session.js";
+import { forceTokenRefresh } from "./copilot-auth.js";
 
 const AUTO_MODEL = "clawpilotrouter/auto";
 const AUTO_MODEL_SHORT = "auto";
@@ -803,6 +804,7 @@ async function proxyRequest(
     let upstream: Response | undefined;
     let lastError: { body: string; status: number } | undefined;
     let actualModelUsed = modelId;
+    let tokenRefreshAttempted = false;
 
     for (let i = 0; i < modelsToTry.length; i++) {
       const tryModel = modelsToTry[i];
@@ -826,6 +828,25 @@ async function proxyRequest(
         }
         console.log(`[ClawPilotRouter] Provider error from ${tryModel}, trying fallback: ${result.errorBody?.slice(0, 100)}`);
         continue;
+      }
+
+      // If we got a 403, the token may have expired — force refresh and retry once per request
+      if (result.errorStatus === 403 && !tokenRefreshAttempted) {
+        tokenRefreshAttempted = true;
+        console.log(`[ClawPilotRouter] Got 403 — attempting token refresh...`);
+        const refreshed = await forceTokenRefresh();
+        if (refreshed) {
+          console.log(`[ClawPilotRouter] Token refreshed, retrying ${tryModel}`);
+          const retryResult = await tryModelRequest(tryModel, requestPath, req.method ?? "POST", body, maxTokens, options.apiKeys, controller.signal);
+          if (retryResult.success && retryResult.response) {
+            upstream = retryResult.response;
+            actualModelUsed = tryModel;
+            console.log(`[ClawPilotRouter] Success with ${tryModel} after token refresh`);
+            break;
+          }
+          lastError = { body: retryResult.errorBody || "Still failing after token refresh", status: retryResult.errorStatus || 500 };
+          console.log(`[ClawPilotRouter] Still failing after token refresh: ${retryResult.errorStatus} ${retryResult.errorBody?.slice(0, 100)}`);
+        }
       }
 
       // If last attempt failed with 429 (quota), try free model as last resort

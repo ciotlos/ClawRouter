@@ -35,9 +35,36 @@ Enter code: XXXX-XXXX
 
 Open the link, enter the code, and you're done. The token is saved to `~/.clawpilotrouter/github_token` and refreshed automatically. No API keys to manage.
 
-Then configure your editor to use `http://127.0.0.1:8402/v1` as the API endpoint with model `auto`.
+Then configure your editor (see [VS Code Setup](#vs-code-setup) below).
 
 That's it. The router uses Claude Sonnet 4 for standard coding tasks and Claude Opus 4 for complex ones. Simple completions go to fast, cheap models. Reasoning tasks go to models with large context windows.
+
+## VS Code Setup
+
+ClawPilotRouter works with VS Code via the [Continue](https://continue.dev) extension, which supports custom OpenAI-compatible endpoints.
+
+1. Install the **Continue** extension from the VS Code marketplace
+2. Open `~/.continue/config.yaml` and add:
+
+```yaml
+name: My Config
+version: 0.0.1
+schema: v1
+
+models:
+  - name: ClawPilotRouter
+    provider: openai
+    model: auto
+    apiBase: http://127.0.0.1:8402/v1
+    apiKey: dummy
+```
+
+3. Start the router: `npx clawpilotrouter`
+4. Select **ClawPilotRouter** from Continue's model dropdown in the sidebar
+
+The `apiKey` value is a placeholder — the router handles authentication via your GitHub token.
+
+To pin a specific model instead of smart routing, replace `auto` with any [model alias](#model-aliases) (e.g. `sonnet`, `opus`).
 
 ## Usage Stats
 

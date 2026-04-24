@@ -31,7 +31,7 @@ export {
 export type { ApiKeysConfig, ProviderConfig } from "./api-keys.js";
 
 // Auth
-export { getCopilotToken, startTokenRefresh, stopTokenRefresh, getCurrentToken } from "./copilot-auth.js";
+export { getCopilotToken, startTokenRefresh, stopTokenRefresh, getCurrentToken, forceTokenRefresh } from "./copilot-auth.js";
 
 // Utilities
 export { logUsage } from "./logger.js";
