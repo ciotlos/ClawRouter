@@ -635,14 +635,15 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
     confidenceThreshold: 0.7,
   },
 
-  // Copilot-optimized tiers — routes to the best coding model per task complexity
+  // Copilot-optimized tiers — balanced for quality AND premium request budget
+  // Multipliers: 0x (free), 0.33x (bargain), 1x (standard), 3x (premium), 7.5x+ (extreme)
   tiers: {
     SIMPLE: {
-      primary: "grok-code-fast-1", // Fast code completions, inline suggestions
-      fallback: ["gemini-3-flash", "gpt-4.1", "gpt-5-mini"],
+      primary: "grok-code-fast-1", // Fast code completions — 0.33x multiplier
+      fallback: ["gemini-3-flash", "gpt-4.1", "gpt-5-mini"], // All 0x-0.33x
     },
     MEDIUM: {
-      primary: "claude-sonnet-4.6", // Strong code gen, refactoring, explanations
+      primary: "claude-sonnet-4.6", // Strong coding — 1x multiplier (sweet spot)
       fallback: [
         "grok-code-fast-1",
         "gpt-4.1",
@@ -650,32 +651,33 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       ],
     },
     COMPLEX: {
-      primary: "claude-opus-4.6", // Best quality for multi-file edits, architecture, debugging
-      fallback: ["claude-sonnet-4.6", "gemini-3.1-pro", "gpt-5.4"],
+      primary: "gpt-5.4", // Strong reasoning at 1x multiplier — real step up from Sonnet
+      fallback: ["claude-sonnet-4.6", "gemini-3.1-pro", "claude-opus-4.6"], // Opus 4.6 at 3x as last resort
     },
     REASONING: {
-      primary: "gemini-3.1-pro", // 1M context, algorithm design, complex debugging
-      fallback: ["claude-opus-4.6", "gpt-5.4", "o3"],
+      primary: "gemini-3.1-pro", // 1M context, strong reasoning — 1x multiplier
+      fallback: ["gpt-5.4", "claude-sonnet-4.6", "o3"],
     },
   },
 
   // Agentic copilot tiers — models that excel at multi-step autonomous coding tasks
+  // Agentic tasks justify higher multipliers since they do more work per request
   agenticTiers: {
     SIMPLE: {
-      primary: "claude-haiku-4.5", // Quick agentic file reads, lookups
+      primary: "claude-haiku-4.5", // Quick agentic file reads — 0.33x multiplier
       fallback: ["grok-code-fast-1", "gpt-5-mini", "gpt-4.1"],
     },
     MEDIUM: {
-      primary: "claude-sonnet-4.6", // Agentic code edits, test writing
+      primary: "claude-sonnet-4.6", // Agentic code edits — 1x multiplier
       fallback: ["gpt-5.3-codex", "grok-code-fast-1", "gemini-3-flash"],
     },
     COMPLEX: {
-      primary: "claude-opus-4.6", // Best agentic model — multi-step refactors, cross-file changes
-      fallback: ["claude-sonnet-4.6", "gpt-5.3-codex", "gemini-3.1-pro"],
+      primary: "gpt-5.4", // Strong reasoning for agentic multi-step work — 1x multiplier
+      fallback: ["claude-sonnet-4.6", "gpt-5.3-codex", "claude-opus-4.6"],
     },
     REASONING: {
       primary: "gemini-3.1-pro", // 1M context for large codebase reasoning
-      fallback: ["claude-opus-4.6", "gpt-5.4", "o3"],
+      fallback: ["gpt-5.4", "claude-sonnet-4.6", "o3"],
     },
   },
 

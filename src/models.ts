@@ -62,6 +62,8 @@ type CopilotModel = {
   vision?: boolean;
   /** Models optimized for agentic workflows (multi-step autonomous tasks) */
   agentic?: boolean;
+  /** Copilot premium request multiplier (0 = free, 0.33 = bargain, 1 = standard, 3+ = premium) */
+  multiplier?: number;
 };
 
 /**

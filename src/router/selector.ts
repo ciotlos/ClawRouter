@@ -33,8 +33,9 @@ export function selectModel(
   const outputCost = pricing ? (maxOutputTokens / 1_000_000) * pricing.outputPrice : 0;
   const costEstimate = inputCost + outputCost;
 
-  // Baseline: what Claude Opus would cost (the premium copilot default)
-  const opusPricing = modelPricing.get("claude-opus-4.6");
+  // Baseline: what Claude Sonnet 4.6 would cost (the standard copilot model)
+  // Using Sonnet as baseline since it's the COMPLEX primary at 1x multiplier
+  const opusPricing = modelPricing.get("claude-sonnet-4.6");
   const baselineInput = opusPricing
     ? (estimatedInputTokens / 1_000_000) * opusPricing.inputPrice
     : 0;

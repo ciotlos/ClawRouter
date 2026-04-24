@@ -10,12 +10,12 @@ Routes every coding request to the best model for the task. Simple completions g
 4. Routes to the best copilot model for the task (4 tiers)
 5. Falls back through alternatives if a provider errors
 
-| Tier | What it handles | Default Model | Why |
+| Tier | What it handles | Default Model | Multiplier |
 |---|---|---|---|
-| **SIMPLE** | Inline completions, lookups, short answers | Grok Code Fast | Fast, cheap, good at code |
-| **MEDIUM** | Code generation, refactoring, explanations | Claude Sonnet 4.6 | Strong coding, good tool use |
-| **COMPLEX** | Multi-file edits, architecture, debugging | Claude Opus 4.6 | Best quality for hard tasks |
-| **REASONING** | Algorithm design, proofs, complex debugging | Gemini 3.1 Pro | 1M context, strong reasoning |
+| **SIMPLE** | Inline completions, lookups, short answers | Grok Code Fast | 0.33x |
+| **MEDIUM** | Code generation, refactoring, explanations | Claude Sonnet 4.6 | 1x |
+| **COMPLEX** | Multi-file edits, architecture, debugging | GPT-5.4 | 1x |
+| **REASONING** | Algorithm design, proofs, complex debugging | Gemini 3.1 Pro | 1x |
 
 ## Quick Start
 
@@ -63,15 +63,15 @@ Example output from the CLI:
 ║  Task distribution:                                        ║
 ║    Quick      ████████████         52% (162 reqs)          ║
 ║    Standard   ██████               28% (87 reqs)           ║
-║    Complex    ███                  13% (41 reqs)            ║
-║    Reasoning  █                     7% (22 reqs)            ║
+║    Complex    ███                  13% (41 reqs)           ║
+║    Reasoning  █                     7% (22 reqs)           ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Models used:                                              ║
-║    grok-code-fast-1                 148 reqs  $0.31         ║
-║    claude-sonnet-4.6                 92 reqs  $1.84         ║
-║    claude-opus-4.6                   41 reqs  $1.62         ║
-║    gemini-3.1-pro                    22 reqs  $0.38         ║
-║    gpt-4.1                            9 reqs  $0.12         ║
+║    grok-code-fast-1                 148 reqs  $0.31        ║
+║    claude-sonnet-4.6                 92 reqs  $1.84        ║
+║    claude-opus-4.6                   41 reqs  $1.62        ║
+║    gemini-3.1-pro                    22 reqs  $0.38        ║
+║    gpt-4.1                            9 reqs  $0.12        ║
 ╚════════════════════════════════════════════════════════════╝
 ```
 
