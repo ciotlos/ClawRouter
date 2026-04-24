@@ -651,8 +651,8 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       ],
     },
     COMPLEX: {
-      primary: "gpt-5.4", // Strong reasoning at 1x multiplier — real step up from Sonnet
-      fallback: ["claude-sonnet-4.6", "gemini-3.1-pro", "claude-opus-4.6"], // Opus 4.6 at 3x as last resort
+      primary: "claude-opus-4.6", // Best quality for hard tasks — 3x multiplier, worth it
+      fallback: ["gpt-5.4", "gemini-3.1-pro", "claude-sonnet-4.6"],
     },
     REASONING: {
       primary: "gemini-3.1-pro", // 1M context, strong reasoning — 1x multiplier
@@ -672,8 +672,8 @@ export const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
       fallback: ["gpt-5.3-codex", "grok-code-fast-1", "gemini-3-flash"],
     },
     COMPLEX: {
-      primary: "gpt-5.4", // Strong reasoning for agentic multi-step work — 1x multiplier
-      fallback: ["claude-sonnet-4.6", "gpt-5.3-codex", "claude-opus-4.6"],
+      primary: "claude-opus-4.6", // Best agentic model — 3x multiplier, justified for multi-step work
+      fallback: ["gpt-5.4", "gpt-5.3-codex", "claude-sonnet-4.6"],
     },
     REASONING: {
       primary: "gemini-3.1-pro", // 1M context for large codebase reasoning
