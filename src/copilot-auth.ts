@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
 
-const CONFIG_DIR = join(homedir(), ".clawrouter");
+const CONFIG_DIR = join(homedir(), ".clawpilotrouter");
 const TOKEN_FILE = join(CONFIG_DIR, "github_token");
 const COPILOT_TOKEN_FILE = join(CONFIG_DIR, "copilot_token");
 
@@ -92,7 +92,7 @@ function loadCachedCopilotToken(): string | null {
 
 /** Run the GitHub OAuth device flow. */
 async function deviceFlow(): Promise<string> {
-  console.log("[ClawRouter] Starting GitHub authentication...");
+  console.log("[ClawPilotRouter] Starting GitHub authentication...");
 
   const codeResp = await fetch(DEVICE_CODE_URL, {
     method: "POST",
@@ -115,7 +115,7 @@ async function deviceFlow(): Promise<string> {
   console.log(`  Visit: ${codeData.verification_uri}`);
   console.log(`  Enter code: ${codeData.user_code}`);
   console.log("");
-  console.log("[ClawRouter] Waiting for authentication...");
+  console.log("[ClawPilotRouter] Waiting for authentication...");
 
   const interval = (codeData.interval || 5) * 1000;
 
@@ -139,7 +139,7 @@ async function deviceFlow(): Promise<string> {
     const tokenData = await tokenResp.json() as { access_token?: string; error?: string };
 
     if (tokenData.access_token) {
-      console.log("[ClawRouter] Authentication successful!");
+      console.log("[ClawPilotRouter] Authentication successful!");
       return tokenData.access_token;
     }
     if (tokenData.error === "authorization_pending") continue;
@@ -184,7 +184,7 @@ export async function getCopilotToken(): Promise<string> {
   // Try disk-cached Copilot token
   const cached = loadCachedCopilotToken();
   if (cached) {
-    console.log("[ClawRouter] Using cached token");
+    console.log("[ClawPilotRouter] Using cached token");
     currentCopilotToken = cached;
     return cached;
   }
@@ -202,7 +202,7 @@ export async function getCopilotToken(): Promise<string> {
 
     // Exchange failed — use the GitHub token directly as Bearer
     // (device flow tokens from the Copilot OAuth app work directly)
-    console.log("[ClawRouter] Using saved token directly");
+    console.log("[ClawPilotRouter] Using saved token directly");
     currentCopilotToken = githubToken;
     saveCopilotToken(githubToken);
     return githubToken;
@@ -228,14 +228,14 @@ export function startTokenRefresh(): void {
       if (exchanged) {
         currentCopilotToken = exchanged;
         saveCopilotToken(exchanged);
-        console.log("[ClawRouter] Copilot token refreshed (exchange)");
+        console.log("[ClawPilotRouter] Copilot token refreshed (exchange)");
       } else {
         // Keep using the GitHub token directly
         currentCopilotToken = githubToken;
         saveCopilotToken(githubToken);
       }
     } catch (err) {
-      console.error(`[ClawRouter] Token refresh failed: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(`[ClawPilotRouter] Token refresh failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, REFRESH_INTERVAL_MS);
 }

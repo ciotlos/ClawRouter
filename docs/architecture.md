@@ -1,6 +1,6 @@
 # Architecture
 
-How ClawRouter routes your copilot requests.
+How ClawPilotRouter routes your copilot requests.
 
 ## System Overview
 
@@ -15,7 +15,7 @@ How ClawRouter routes your copilot requests.
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              ClawRouter Proxy (localhost:8402)              │
+│              ClawPilotRouter Proxy (localhost:8402)              │
 │                                                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌───────────────────┐   │
 │  │   Dedup     │→ │   Router    │→ │   Model           │   │
@@ -99,7 +99,7 @@ src/
 ├── models.ts         # 30+ model definitions with pricing
 ├── api-keys.ts       # Copilot API key loading (env var, config file)
 ├── dedup.ts          # Request deduplication (SHA-256 cache)
-├── logger.ts         # JSON usage logging to ~/.clawrouter/logs/
+├── logger.ts         # JSON usage logging to ~/.clawpilotrouter/logs/
 ├── stats.ts          # Usage statistics aggregation
 ├── retry.ts          # Fetch retry with exponential backoff
 ├── session.ts        # Conversation session pinning

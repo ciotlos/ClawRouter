@@ -41,7 +41,7 @@ import { RequestDeduplicator } from "./dedup.js";
 import { USER_AGENT } from "./version.js";
 import { SessionStore, getSessionId, type SessionConfig } from "./session.js";
 
-const AUTO_MODEL = "clawrouter/auto";
+const AUTO_MODEL = "clawpilotrouter/auto";
 const AUTO_MODEL_SHORT = "auto";
 const HEARTBEAT_INTERVAL_MS = 2_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 180_000;
@@ -66,7 +66,7 @@ function isRateLimited(modelId: string): boolean {
 
 function markRateLimited(modelId: string): void {
   rateLimitedModels.set(modelId, Date.now());
-  console.log(`[ClawRouter] Model ${modelId} rate-limited, will deprioritize for 60s`);
+  console.log(`[ClawPilotRouter] Model ${modelId} rate-limited, will deprioritize for 60s`);
 }
 
 function prioritizeNonRateLimited(models: string[]): string[] {
@@ -88,7 +88,7 @@ function safeWrite(res: ServerResponse, data: string | Buffer): boolean {
 }
 
 export function getProxyPort(): number {
-  const envPort = process.env.CLAWROUTER_PORT;
+  const envPort = process.env.CLAWPILOTROUTER_PORT;
   if (envPort) {
     const parsed = parseInt(envPort, 10);
     if (!isNaN(parsed) && parsed > 0 && parsed < 65536) return parsed;
@@ -115,7 +115,7 @@ async function checkExistingProxy(port: number): Promise<boolean> {
 
 const PROVIDER_ERROR_PATTERNS = [
   /billing/i, /insufficient.*balance/i, /credits/i, /quota.*exceeded/i,
-  /rate.*limit/i, /model.*unavailable/i, /service.*unavailable/i,
+  /rate.*limit/i, /model.*unavailable/i, /model.*not.*supported/i, /service.*unavailable/i,
   /capacity/i, /overloaded/i, /temporarily.*unavailable/i,
   /api.*key.*invalid/i, /authentication.*failed/i,
 ];
@@ -452,7 +452,7 @@ async function tryModelRequest(
   const headers = buildProviderHeaders(upstream.provider, upstream.apiKey, upstream.viaOpenRouter);
 
   try {
-    console.log(`[ClawRouter] → ${upstream.url} model=${upstream.actualModelId}`);
+    console.log(`[ClawPilotRouter] → ${upstream.url} model=${upstream.actualModelId}`);
     const response = await fetch(upstream.url, {
       method,
       headers,
@@ -462,7 +462,7 @@ async function tryModelRequest(
 
     if (response.status !== 200) {
       const errorBody = await response.text();
-      console.log(`[ClawRouter] ← ${response.status} ${errorBody.slice(0, 200)}`);
+      console.log(`[ClawPilotRouter] ← ${response.status} ${errorBody.slice(0, 200)}`);
       return {
         success: false,
         errorBody,
@@ -506,9 +506,9 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   const connections = new Set<import("net").Socket>();
 
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    req.on("error", (err) => console.error(`[ClawRouter] Request stream error: ${err.message}`));
-    res.on("error", (err) => console.error(`[ClawRouter] Response stream error: ${err.message}`));
-    finished(res, (err) => { if (err && err.code !== "ERR_STREAM_DESTROYED") console.error(`[ClawRouter] Response finished with error: ${err.message}`); });
+    req.on("error", (err) => console.error(`[ClawPilotRouter] Request stream error: ${err.message}`));
+    res.on("error", (err) => console.error(`[ClawPilotRouter] Response stream error: ${err.message}`));
+    finished(res, (err) => { if (err && err.code !== "ERR_STREAM_DESTROYED") console.error(`[ClawPilotRouter] Response finished with error: ${err.message}`); });
 
     // Health check
     if (req.url === "/health" || req.url?.startsWith("/health?")) {
@@ -614,13 +614,13 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   const port = addr.port;
   options.onReady?.(port);
 
-  server.on("error", (err) => { console.error(`[ClawRouter] Server runtime error: ${err.message}`); options.onError?.(err); });
-  server.on("clientError", (err, socket) => { console.error(`[ClawRouter] Client error: ${err.message}`); if (socket.writable && !socket.destroyed) socket.end("HTTP/1.1 400 Bad Request\r\n\r\n"); });
+  server.on("error", (err) => { console.error(`[ClawPilotRouter] Server runtime error: ${err.message}`); options.onError?.(err); });
+  server.on("clientError", (err, socket) => { console.error(`[ClawPilotRouter] Client error: ${err.message}`); if (socket.writable && !socket.destroyed) socket.end("HTTP/1.1 400 Bad Request\r\n\r\n"); });
   server.on("connection", (socket) => {
     connections.add(socket);
     socket.setTimeout(300_000);
     socket.on("timeout", () => socket.destroy());
-    socket.on("error", (err) => console.error(`[ClawRouter] Socket error: ${err.message}`));
+    socket.on("error", (err) => console.error(`[ClawPilotRouter] Socket error: ${err.message}`));
     socket.on("close", () => connections.delete(socket));
   });
 
@@ -629,7 +629,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
     baseUrl: `http://127.0.0.1:${port}`,
     configuredProviders,
     close: () => new Promise<void>((res, rej) => {
-      const timeout = setTimeout(() => rej(new Error("[ClawRouter] Close timeout after 4s")), 4000);
+      const timeout = setTimeout(() => rej(new Error("[ClawPilotRouter] Close timeout after 4s")), 4000);
       sessionStore.close();
       for (const socket of connections) socket.destroy();
       connections.clear();
@@ -676,9 +676,9 @@ async function proxyRequest(
       const isAutoModel = normalizedModel === AUTO_MODEL.toLowerCase() ||
         normalizedModel === AUTO_MODEL_SHORT.toLowerCase() ||
         normalizedModel === "blockrun/auto" || // backward compat
-        normalizedModel === "clawrouter/auto";
+        normalizedModel === "clawpilotrouter/auto";
 
-      console.log(`[ClawRouter] Received model: "${parsed.model}" -> normalized: "${normalizedModel}"${wasAlias ? ` -> alias: "${resolvedModel}"` : ""}, isAuto: ${isAutoModel}`);
+      console.log(`[ClawPilotRouter] Received model: "${parsed.model}" -> normalized: "${normalizedModel}"${wasAlias ? ` -> alias: "${resolvedModel}"` : ""}, isAuto: ${isAutoModel}`);
 
       if (wasAlias && !isAutoModel) {
         parsed.model = resolvedModel;
@@ -690,7 +690,7 @@ async function proxyRequest(
         const existingSession = sessionId ? sessionStore.getSession(sessionId) : undefined;
 
         if (existingSession) {
-          console.log(`[ClawRouter] Session ${sessionId?.slice(0, 8)}... using pinned model: ${existingSession.model}`);
+          console.log(`[ClawPilotRouter] Session ${sessionId?.slice(0, 8)}... using pinned model: ${existingSession.model}`);
           parsed.model = existingSession.model;
           modelId = existingSession.model;
           sessionStore.touchSession(sessionId!);
@@ -746,7 +746,7 @@ async function proxyRequest(
       body = Buffer.from(JSON.stringify(parsed));
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[ClawRouter] Routing error: ${errorMsg}`);
+      console.error(`[ClawPilotRouter] Routing error: ${errorMsg}`);
       options.onError?.(new Error(`Routing failed: ${errorMsg}`));
     }
   }
@@ -807,14 +807,14 @@ async function proxyRequest(
     for (let i = 0; i < modelsToTry.length; i++) {
       const tryModel = modelsToTry[i];
       const isLastAttempt = i === modelsToTry.length - 1;
-      console.log(`[ClawRouter] Trying model ${i + 1}/${modelsToTry.length}: ${tryModel}`);
+      console.log(`[ClawPilotRouter] Trying model ${i + 1}/${modelsToTry.length}: ${tryModel}`);
 
       const result = await tryModelRequest(tryModel, requestPath, req.method ?? "POST", body, maxTokens, options.apiKeys, controller.signal);
 
       if (result.success && result.response) {
         upstream = result.response;
         actualModelUsed = tryModel;
-        console.log(`[ClawRouter] Success with model: ${tryModel}`);
+        console.log(`[ClawPilotRouter] Success with model: ${tryModel}`);
         break;
       }
 
@@ -822,21 +822,21 @@ async function proxyRequest(
       if (result.isProviderError && !isLastAttempt) {
         if (result.errorStatus === 429) {
           markRateLimited(tryModel);
-          console.log(`[ClawRouter] Quota exceeded for ${tryModel}`);
+          console.log(`[ClawPilotRouter] Quota exceeded for ${tryModel}`);
         }
-        console.log(`[ClawRouter] Provider error from ${tryModel}, trying fallback: ${result.errorBody?.slice(0, 100)}`);
+        console.log(`[ClawPilotRouter] Provider error from ${tryModel}, trying fallback: ${result.errorBody?.slice(0, 100)}`);
         continue;
       }
 
       // If last attempt failed with 429 (quota), try free model as last resort
       if (result.errorStatus === 429 && isLastAttempt) {
         const FREE_MODEL = "gpt-4.1";
-        console.log(`[ClawRouter] Premium quota exceeded — falling back to free model: ${FREE_MODEL}`);
+        console.log(`[ClawPilotRouter] Premium quota exceeded — falling back to free model: ${FREE_MODEL}`);
         const freeResult = await tryModelRequest(FREE_MODEL, requestPath, req.method ?? "POST", body, maxTokens, options.apiKeys, controller.signal);
         if (freeResult.success && freeResult.response) {
           upstream = freeResult.response;
           actualModelUsed = FREE_MODEL;
-          console.log(`[ClawRouter] Success with free model: ${FREE_MODEL}`);
+          console.log(`[ClawPilotRouter] Success with free model: ${FREE_MODEL}`);
           break;
         }
         lastError = { body: freeResult.errorBody || "Free model also failed", status: freeResult.errorStatus || 500 };

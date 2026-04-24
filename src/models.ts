@@ -75,7 +75,7 @@ export const COPILOT_MODELS: CopilotModel[] = [
   // Smart routing meta-model — proxy replaces with actual model
   {
     id: "auto",
-    name: "ClawRouter Auto",
+    name: "ClawPilotRouter Auto",
     inputPrice: 0,
     outputPrice: 0,
     contextWindow: 1_050_000,

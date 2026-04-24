@@ -11,8 +11,8 @@ curl http://127.0.0.1:8402/health | python3 -m json.tool
 # Look for "configuredProviders" and "accessibleProviders"
 
 # 3. Check routing is working
-# Watch the terminal where clawrouter is running — you'll see:
-# [ClawRouter] SIMPLE    → grok-code-fast-1 (confidence=0.92)
+# Watch the terminal where clawpilotrouter is running — you'll see:
+# [ClawPilotRouter] SIMPLE    → grok-code-fast-1 (confidence=0.92)
 ```
 
 ## Common Issues
@@ -20,19 +20,19 @@ curl http://127.0.0.1:8402/health | python3 -m json.tool
 ### No API keys configured
 
 ```
-[ClawRouter] Authentication failed
+[ClawPilotRouter] Authentication failed
 ```
 
-ClawRouter authenticates via GitHub OAuth. Run `clawrouter` and follow the device flow prompts. If you're in a non-interactive environment, set `GH_TOKEN` or `COPILOT_GITHUB_TOKEN`.
+ClawPilotRouter authenticates via GitHub OAuth. Run `clawpilotrouter` and follow the device flow prompts. If you're in a non-interactive environment, set `GH_TOKEN` or `COPILOT_GITHUB_TOKEN`.
 
 ### Port already in use
 
-ClawRouter automatically detects and reuses an existing proxy on the same port. If you need a different port:
+ClawPilotRouter automatically detects and reuses an existing proxy on the same port. If you need a different port:
 
 ```bash
-clawrouter --port 9000
+clawpilotrouter --port 9000
 # or
-export CLAWROUTER_PORT=9000
+export CLAWPILOTROUTER_PORT=9000
 ```
 
 ### Model not accessible
@@ -56,11 +56,11 @@ Make sure your editor is configured to use:
 
 ### Streaming not working
 
-ClawRouter converts non-streaming provider responses to SSE format automatically. If your editor requires streaming, make sure `"stream": true` is in the request body (most editors do this by default).
+ClawPilotRouter converts non-streaming provider responses to SSE format automatically. If your editor requires streaming, make sure `"stream": true` is in the request body (most editors do this by default).
 
 ## Logs
 
-Usage logs are stored at `~/.clawrouter/logs/usage-YYYY-MM-DD.jsonl`. Each line is a JSON object with the model used, tier, cost, and latency.
+Usage logs are stored at `~/.clawpilotrouter/logs/usage-YYYY-MM-DD.jsonl`. Each line is a JSON object with the model used, tier, cost, and latency.
 
 ## Health Check
 

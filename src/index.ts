@@ -1,11 +1,11 @@
 /**
- * ClawRouter — Copilot Model Router
+ * ClawPilotRouter — Copilot Model Router
  *
  * Routes each coding request to the best model for the task.
  * Runs as a standalone OpenAI-compatible proxy.
  *
  * Usage:
- *   clawrouter                    # Start the router
+ *   clawpilotrouter                    # Start the router
  *   # Point your editor at http://127.0.0.1:8402/v1, model "auto"
  */
 

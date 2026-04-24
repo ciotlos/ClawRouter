@@ -1,12 +1,12 @@
-# ClawRouter — Copilot Model Router
+# ClawPilotRouter — Copilot Model Router
 
 Routes every coding request to the best model for the task. Simple completions get a fast model, complex refactors get a strong one. Runs as a local OpenAI-compatible proxy — point your editor at it and go.
 
 ## How It Works
 
-1. You start ClawRouter (one command)
+1. You start ClawPilotRouter (one command)
 2. Point your copilot/editor at `http://127.0.0.1:8402/v1` with model `auto`
-3. ClawRouter classifies each request across **14 weighted dimensions** in <1ms
+3. ClawPilotRouter classifies each request across **14 weighted dimensions** in <1ms
 4. Routes to the best copilot model for the task (4 tiers)
 5. Falls back through alternatives if a provider errors
 
@@ -20,10 +20,10 @@ Routes every coding request to the best model for the task. Simple completions g
 ## Quick Start
 
 ```bash
-npm install -g clawrouter
+npm install -g clawpilotrouter
 
 # Start the router — authenticates via GitHub on first run
-clawrouter
+clawpilotrouter
 ```
 
 On first run, you'll see:
@@ -33,7 +33,7 @@ Visit: https://github.com/login/device
 Enter code: XXXX-XXXX
 ```
 
-Open the link, enter the code, and you're done. The token is saved to `~/.clawrouter/github_token` and refreshed automatically. No API keys to manage.
+Open the link, enter the code, and you're done. The token is saved to `~/.clawpilotrouter/github_token` and refreshed automatically. No API keys to manage.
 
 Then configure your editor to use `http://127.0.0.1:8402/v1` as the API endpoint with model `auto`.
 
@@ -41,7 +41,7 @@ That's it. The router uses Claude Sonnet 4 for standard coding tasks and Claude 
 
 ## Usage Stats
 
-ClawRouter logs every routed request locally. Check your stats via the `/stats` endpoint:
+ClawPilotRouter logs every routed request locally. Check your stats via the `/stats` endpoint:
 
 ```bash
 curl http://127.0.0.1:8402/stats | python3 -m json.tool
@@ -51,7 +51,7 @@ Example output from the CLI:
 
 ```
 ╔════════════════════════════════════════════════════════════╗
-║              ClawRouter — Copilot Stats                    ║
+║              ClawPilotRouter — Copilot Stats                    ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Period: last 7 days                                       ║
 ║  Requests routed: 312                                      ║
@@ -79,7 +79,7 @@ The "If all Opus" line shows what it would cost to send every request to Claude 
 
 ## Agentic Auto-Detection
 
-ClawRouter detects multi-step coding tasks and routes to models optimized for autonomous execution:
+ClawPilotRouter detects multi-step coding tasks and routes to models optimized for autonomous execution:
 
 ```
 "what does this function do"           → grok-code-fast (SIMPLE)
@@ -120,17 +120,17 @@ Pin a specific model instead of using `auto`:
 ## CLI Options
 
 ```bash
-clawrouter                  # Start (authenticates on first run)
-clawrouter --port 9000      # Custom port
-clawrouter --version        # Show version
-clawrouter --help           # Show help
+clawpilotrouter                  # Start (authenticates on first run)
+clawpilotrouter --port 9000      # Custom port
+clawpilotrouter --version        # Show version
+clawpilotrouter --help           # Show help
 ```
 
-Port can also be set via `CLAWROUTER_PORT` environment variable.
+Port can also be set via `CLAWPILOTROUTER_PORT` environment variable.
 
 ## Authentication
 
-On first run, ClawRouter authenticates via GitHub OAuth device flow — you visit a URL and enter a code. The token is saved to `~/.clawrouter/github_token` and refreshed automatically.
+On first run, ClawPilotRouter authenticates via GitHub OAuth device flow — you visit a URL and enter a code. The token is saved to `~/.clawpilotrouter/github_token` and refreshed automatically.
 
 For non-interactive environments, set `GH_TOKEN` or `COPILOT_GITHUB_TOKEN` as an environment variable.
 

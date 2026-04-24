@@ -2,7 +2,7 @@
 
 ## Agentic Auto-Detection
 
-ClawRouter detects multi-step coding tasks and routes to models optimized for autonomous execution:
+ClawPilotRouter detects multi-step coding tasks and routes to models optimized for autonomous execution:
 
 ```
 "what does this function do"              → grok-code-fast (SIMPLE)
@@ -76,7 +76,7 @@ Pin a specific model instead of `auto`:
 
 ## Usage Stats
 
-Stats are logged locally to `~/.clawrouter/logs/` and available via:
+Stats are logged locally to `~/.clawpilotrouter/logs/` and available via:
 
 ```bash
 curl http://127.0.0.1:8402/stats

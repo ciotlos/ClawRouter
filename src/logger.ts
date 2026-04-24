@@ -2,7 +2,7 @@
  * Usage Logger
  *
  * Logs every routed request as a JSON line to a daily log file.
- * Files: ~/.clawrouter/logs/usage-YYYY-MM-DD.jsonl
+ * Files: ~/.clawpilotrouter/logs/usage-YYYY-MM-DD.jsonl
  *
  * Tracks token usage and which models handled which tiers,
  * so you can see how the router is distributing your copilot workload.
@@ -28,7 +28,7 @@ export type UsageEntry = {
   reasoning?: string;
 };
 
-const LOG_DIR = join(homedir(), ".clawrouter", "logs");
+const LOG_DIR = join(homedir(), ".clawpilotrouter", "logs");
 let dirReady = false;
 
 async function ensureDir(): Promise<void> {

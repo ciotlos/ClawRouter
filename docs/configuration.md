@@ -2,15 +2,15 @@
 
 ## Authentication
 
-ClawRouter authenticates via GitHub OAuth device flow on first run. No API keys needed.
+ClawPilotRouter authenticates via GitHub OAuth device flow on first run. No API keys needed.
 
 ```bash
-clawrouter
+clawpilotrouter
 # Visit: https://github.com/login/device
 # Enter code: XXXX-XXXX
 ```
 
-The GitHub token is saved to `~/.clawrouter/github_token` and exchanged for a short-lived Copilot token automatically. The Copilot token refreshes every 25 minutes in the background.
+The GitHub token is saved to `~/.clawpilotrouter/github_token` and exchanged for a short-lived Copilot token automatically. The Copilot token refreshes every 25 minutes in the background.
 
 ### Environment Variables
 
@@ -21,17 +21,17 @@ You can skip the interactive flow by setting a token:
 | `COPILOT_GITHUB_TOKEN` | GitHub token with copilot scope (highest priority) |
 | `GH_TOKEN` | GitHub CLI token (fallback) |
 | `GITHUB_TOKEN` | GitHub Actions token (fallback) |
-| `CLAWROUTER_PORT` | Proxy port (default: 8402) |
+| `CLAWPILOTROUTER_PORT` | Proxy port (default: 8402) |
 
 ## Proxy Settings
 
 | Setting | Default | Env Variable |
 |---|---|---|
-| Port | 8402 | `CLAWROUTER_PORT` |
+| Port | 8402 | `CLAWPILOTROUTER_PORT` |
 | Request timeout | 180s | — |
 | Heartbeat interval | 2s | — |
 
-If a proxy is already running on the configured port, ClawRouter reuses it instead of failing.
+If a proxy is already running on the configured port, ClawPilotRouter reuses it instead of failing.
 
 ## Routing Tiers
 
@@ -48,10 +48,10 @@ Agentic tasks (auto-detected) use a separate tier config optimized for multi-ste
 
 ## Programmatic Usage
 
-Use ClawRouter as a library:
+Use ClawPilotRouter as a library:
 
 ```typescript
-import { startProxy, getCopilotToken, createLiveApiKeys, startTokenRefresh } from "clawrouter";
+import { startProxy, getCopilotToken, createLiveApiKeys, startTokenRefresh } from "clawpilotrouter";
 
 await getCopilotToken();
 startTokenRefresh();

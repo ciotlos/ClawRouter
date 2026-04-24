@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import type { UsageEntry } from "./logger.js";
 
-const LOG_DIR = join(homedir(), ".clawrouter", "logs");
+const LOG_DIR = join(homedir(), ".clawpilotrouter", "logs");
 
 export type DailyStats = {
   date: string;
@@ -202,7 +202,7 @@ export function formatStatsAscii(stats: AggregatedStats): string {
   const lines: string[] = [];
 
   lines.push("╔════════════════════════════════════════════════════════════╗");
-  lines.push("║              ClawRouter — Copilot Stats                    ║");
+  lines.push("║              ClawPilotRouter — Copilot Stats                    ║");
   lines.push("╠════════════════════════════════════════════════════════════╣");
 
   lines.push(`║  Period: ${stats.period.padEnd(49)}║`);

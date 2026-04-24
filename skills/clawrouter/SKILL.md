@@ -1,19 +1,19 @@
 ---
-name: clawrouter
+name: clawpilotrouter
 description: Standalone copilot model router — routes every coding request to the best model for the task. Picks the right model across Claude, Gemini, GPT, DeepSeek, and Grok based on task complexity.
-homepage: https://github.com/BlockRunAI/ClawRouter
+homepage: https://github.com/BlockRunAI/ClawPilotRouter
 metadata: { "emoji": "🦀" }
 ---
 
-# ClawRouter — Copilot Model Router
+# ClawPilotRouter — Copilot Model Router
 
 Standalone proxy that picks the right copilot model for each coding task. Runs as an OpenAI-compatible endpoint — point any editor or tool at it.
 
 ## Install & Run
 
 ```bash
-npm install -g clawrouter
-clawrouter
+npm install -g clawpilotrouter
+clawpilotrouter
 ```
 
 On first run, you'll authenticate via GitHub (visit a URL, enter a code). After that, the token is saved and refreshed automatically.
@@ -22,7 +22,7 @@ Then point your editor/copilot at `http://127.0.0.1:8402/v1` with model `auto`.
 
 ## How Routing Works
 
-ClawRouter classifies each coding request into one of four tiers and routes to the best model:
+ClawPilotRouter classifies each coding request into one of four tiers and routes to the best model:
 
 - **SIMPLE** — inline completions, quick lookups → Grok Code Fast ($0.20/M, fast)
 - **MEDIUM** — code generation, refactoring, explanations → Claude Sonnet 4.6 ($3/M, strong coding)
@@ -36,9 +36,9 @@ Rules handle ~80% of requests in <1ms. Only ambiguous queries use the LLM classi
 ## Example Output
 
 ```
-[ClawRouter] SIMPLE    → grok-code-fast-1 (confidence=0.92)
-[ClawRouter] COMPLEX   → claude-opus-4.6 (confidence=0.88)
-[ClawRouter] REASONING → gemini-3.1-pro (confidence=0.91)
+[ClawPilotRouter] SIMPLE    → grok-code-fast-1 (confidence=0.92)
+[ClawPilotRouter] COMPLEX   → claude-opus-4.6 (confidence=0.88)
+[ClawPilotRouter] REASONING → gemini-3.1-pro (confidence=0.91)
 ```
 
 ## Stats
